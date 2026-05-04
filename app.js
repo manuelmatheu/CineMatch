@@ -119,5 +119,27 @@ root.addEventListener('click', (e) => {
 
 window.addEventListener('hashchange', render);
 
+// File picker feedback for the setup wizard CSV step.
+// Direct DOM mutation (no re-render) so we don't blow away the picked file.
+root.addEventListener('change', (e) => {
+  const target = e.target;
+  if (target.dataset && target.dataset.action === 'csv-pick') {
+    const file = target.files && target.files[0];
+    const label = document.getElementById('setup-csv-label');
+    if (!label) return;
+    const prompt = label.querySelector('.m-setup__drop-prompt');
+    const sub = label.querySelector('.m-setup__drop-sub');
+    if (file) {
+      label.classList.add('is-filled');
+      if (prompt) prompt.textContent = file.name;
+      if (sub) sub.textContent = `${(file.size / 1024).toFixed(1)} KB · ready`;
+    } else {
+      label.classList.remove('is-filled');
+      if (prompt) prompt.textContent = 'Tap to choose CSV';
+      if (sub) sub.textContent = 'stays on your device';
+    }
+  }
+});
+
 // Boot.
 render();

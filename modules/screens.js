@@ -436,16 +436,28 @@ export function setupScreen(step = 1) {
     body = `
       <h1 class="m-setup__title">Paste your<br/>TMDB token</h1>
       <p class="m-setup__lede">Free + non-commercial. Stored in localStorage only — never on a server.</p>
-      <div class="m-setup__token">eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI…</div>
+      <label class="visually-hidden" for="setup-tmdb-token">TMDB read access token</label>
+      <textarea id="setup-tmdb-token"
+                class="m-setup__token"
+                rows="4"
+                spellcheck="false"
+                autocapitalize="off"
+                autocomplete="off"
+                placeholder="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI…"></textarea>
     `;
   } else {
     body = `
       <h1 class="m-setup__title">Drop your<br/>CSV export</h1>
       <p class="m-setup__lede">Optional but recommended. Gives us your full history, not just the recent 50.</p>
-      <div class="m-setup__drop">
+      <label class="m-setup__drop" for="setup-csv-input" id="setup-csv-label">
         <div class="m-setup__drop-prompt">Tap to choose CSV</div>
         <div class="m-setup__drop-sub">stays on your device</div>
-      </div>
+        <input type="file"
+               id="setup-csv-input"
+               class="m-setup__drop-input"
+               accept=".csv,text/csv"
+               data-action="csv-pick" />
+      </label>
     `;
   }
 

@@ -15,7 +15,10 @@
 .m-shell {
   width: 100%;
   max-width: 480px;
-  min-height: 100dvh;
+  /* Pin to viewport so the absolute-positioned tabbar stays at the bottom
+     instead of walking down with long content. */
+  height: 100dvh;
+  max-height: 100dvh;
   background: var(--ink-900);
   color: var(--bone-200);
   display: flex;
@@ -31,6 +34,9 @@
 }
 .m-scroll {
   flex: 1;
+  /* Override flex-item default min-height: auto so the scroll region can
+     shrink below its content's intrinsic size and actually scroll. */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-bottom: 88px; /* footer nav clearance */
@@ -152,6 +158,10 @@
   letter-spacing: -0.01em;
 }
 .m-poster--big .m-poster__title { font-size: 22px; }
+/* Hide the title overlay on small posters — it duplicates the title shown in
+   the card body and collides with the match badge in the bottom-left. */
+.m-poster:not(.m-poster--big) .m-poster__title,
+.m-poster:not(.m-poster--big) .m-poster__year { display: none; }
 .m-poster__year {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -881,23 +891,58 @@
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
 }
+/* Editable token field — JWTs are long, so use a small textarea for wrap. */
 .m-setup__token {
+  display: block;
+  width: 100%;
   border: var(--hairline);
   border-radius: 6px;
   padding: 14px;
   background: var(--ink-850);
+  color: var(--bone-100);
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--bone-300);
-  word-break: break-all;
   line-height: 1.5;
+  word-break: break-all;
+  resize: vertical;
+  min-height: 96px;
+  transition: border-color var(--dur) var(--ease-out);
 }
+.m-setup__token::placeholder { color: var(--bone-500); }
+.m-setup__token:hover { border-color: var(--ink-500); }
+.m-setup__token:focus-visible {
+  outline: none;
+  border-color: var(--amber-500);
+  box-shadow: 0 0 0 1px var(--amber-500);
+}
+
+/* CSV dropzone — visually a dashed box, semantically a label wrapping a
+   hidden file input. Hover/focus/active states convey interactivity. */
 .m-setup__drop {
+  display: block;
   border: 1px dashed var(--ink-500);
   border-radius: 6px;
   padding: 32px 16px;
   text-align: center;
-  background: rgba(255,255,255,0.01);
+  background: rgba(255, 255, 255, 0.01);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out),
+              background var(--dur) var(--ease-out);
+}
+@media (hover: hover) {
+  .m-setup__drop:hover {
+    border-color: var(--amber-500);
+    background: rgba(255, 255, 255, 0.025);
+  }
+}
+.m-setup__drop:focus-within {
+  border-color: var(--amber-500);
+  background: rgba(255, 255, 255, 0.025);
+}
+.m-setup__drop.is-filled {
+  border-style: solid;
+  border-color: var(--amber-500);
+  background: rgba(180, 110, 40, 0.06);
 }
 .m-setup__drop-prompt {
   font-family: var(--font-mono);
@@ -911,6 +956,18 @@
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--bone-500);
+}
+.m-setup__drop-input {
+  /* Visually hidden but keyboard-focusable */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .m-setup__footer {
   margin-top: auto;
@@ -928,6 +985,19 @@
 .eyebrow--mb-md  { margin-bottom: 12px; }
 .eyebrow--mb-lg  { margin-bottom: 14px; }
 .eyebrow--stat   { margin-bottom: 8px; font-size: 9px; }
+
+/* --- Visually hidden but available to screen readers + keyboard -------- */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* --- Cluster spacing utilities (one-off margins for screen content) --- */
 .m-mt-md  { margin-top: 20px; }
