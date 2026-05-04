@@ -250,11 +250,12 @@ root.addEventListener('change', (e) => {
 window.addEventListener('hashchange', render);
 
 // When the resolver completes a batch (every 10 entries), re-render the
-// current screen if it's the diary so newly resolved posters appear
-// without the user having to refresh. Other screens read fixture data
-// for now so they don't need this.
+// current screen if it shows live data (diary, taste, more) so newly
+// resolved posters / enriched genres / refreshed counts appear without
+// the user having to refresh.
+const LIVE_SCREENS = new Set(['diary', 'taste', 'more']);
 window.addEventListener(RESOLVER_PROGRESS_EVENT, () => {
-  if (parseHash().name === 'diary') render();
+  if (LIVE_SCREENS.has(parseHash().name)) render();
 });
 
 // Boot.

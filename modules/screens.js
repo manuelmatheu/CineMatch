@@ -252,15 +252,70 @@ export function upcomingScreen() {
 
 // =====================================================================
 // TASTE — stat grid, genre bars, directors, decade chart, languages
+// Reads the live TasteProfile computed by modules/taste.js from the
+// resolver's enriched watch_history. Shows building/empty states when
+// the profile isn't ready yet.
 // =====================================================================
 export function tasteScreen() {
-  const t = CINEMATCH_DATA.taste;
+  const profile = storage.getTasteProfile();
+  const history = storage.getHistory();
+
+  // === Empty state: setup not run, or no history yet ===
+  if (history.length === 0) {
+    const content = `
+      ${header({ eyebrow: 'No history yet', title: 'Your taste' })}
+      <div class="m-empty">
+        <div class="m-empty__title">No films logged</div>
+        <p class="m-empty__body">Complete setup so we can read your Letterboxd diary, then your taste profile builds automatically as we resolve films against TMDB.</p>
+        <button class="m-btn m-btn--ghost" data-action="open-setup">Open setup</button>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'taste' });
+  }
+
+  // === Building state: enrichment hasn't produced enough rated films ===
+  if (!profile || !profile.ready) {
+    const enriched = history.filter((e) => Array.isArray(e.genres)).length;
+    const total = history.length;
+    const pct = total > 0 ? Math.round((enriched / total) * 100) : 0;
+    const message = profile?.message || 'Resolving films against TMDB to learn your taste…';
+    const content = `
+      ${header({ eyebrow: 'Building your profile', title: 'Your taste' })}
+      <div class="m-empty">
+        <div class="m-empty__title">Hold on a minute</div>
+        <p class="m-empty__body">${esc(message)}</p>
+        <div class="m-taste__progress">
+          <div class="m-taste__progress-track">
+            <div class="m-taste__progress-fill" style="width:${pct}%;"></div>
+          </div>
+          <div class="m-taste__progress-label">${enriched} / ${total} films enriched</div>
+        </div>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'taste' });
+  }
+
+  // === Live profile ===
+  const t = {
+    topGenres: profile.topGenres,
+    topDirectors: profile.topDirectors,
+    decades: profile.decades,
+    languages: profile.languages,
+  };
+
+  // Derive headline stats from the live history, not from fixture data.
+  const ratedHistory = history.filter((e) => typeof e.rating === 'number' && e.rating > 0);
+  const avgRating = ratedHistory.length
+    ? (ratedHistory.reduce((s, e) => s + e.rating, 0) / ratedHistory.length).toFixed(1)
+    : '—';
+  const thisYearStart = `${new Date().getFullYear()}-01-01`;
+  const thisYearCount = history.filter((e) => (e.watched_date || '') >= thisYearStart).length;
 
   const stats = [
-    { label: 'Films logged', value: '847', sub: 'since Apr 2019' },
-    { label: 'This year',    value: '112', sub: '+18% YoY' },
-    { label: 'Avg rating',   value: '3.4', sub: '★★★⯨' },
-    { label: 'Avg runtime',  value: '118', sub: 'minutes' },
+    { label: 'Films logged', value: String(history.length), sub: `${profile.enrichedCount} enriched` },
+    { label: 'This year',    value: String(thisYearCount),  sub: `vs all-time` },
+    { label: 'Avg rating',   value: String(avgRating),      sub: `${ratedHistory.length} rated` },
+    { label: 'Avg runtime',  value: String(profile.runtime.avg || '—'), sub: 'minutes' },
   ].map((s) => `
     <div class="m-taste__stat">
       <div class="eyebrow eyebrow--stat">${esc(s.label)}</div>
@@ -288,10 +343,10 @@ export function tasteScreen() {
     </div>
   `).join('');
 
-  const maxDecade = Math.max(...t.decades.map((x) => x.count));
+  const maxDecade = Math.max(...t.decades.map((x) => x.count), 1);
   const decadeCols = t.decades.map((d) => {
     const h = (d.count / maxDecade) * 100;
-    const isPeak = d.decade === '2010s';
+    const isPeak = d.count === maxDecade;
     return `
       <div class="m-taste__decade ${isPeak ? 'is-peak' : ''}">
         <span class="m-taste__decade-count">${esc(d.count)}</span>
@@ -315,9 +370,9 @@ export function tasteScreen() {
     </div>
   `).join('');
 
+  const eyebrow = `${profile.ratedCount} rated films · live`;
   const content = `
-    ${header({ eyebrow: '847 films · 2019 → present', title: 'Your taste' })}
-    ${fixtureNote('Taste profile is computed in Phase 3 from your real watch history.')}
+    ${header({ eyebrow, title: 'Your taste' })}
     <div class="m-taste-body">
       <div class="m-taste__statgrid">${stats}</div>
 

@@ -95,3 +95,46 @@ export async function searchMovie(title, year, token) {
 
   return results[0];
 }
+
+/**
+ * Fetches the full movie record + credits in a single request.
+ * Returns the fields we need for the taste profile, normalized.
+ *
+ *   { genres: ["Drama", "Romance"],
+ *     director: "Charlotte Wells",     // first credited director
+ *     directors: ["Charlotte Wells"],  // all of them (handles Coens/Safdies)
+ *     runtime: 102,                    // minutes; null if unknown
+ *     original_language: "en",         // ISO 639-1
+ *     release_date: "2022-10-21" }
+ *
+ * Returns null on 404; throws on other HTTP errors.
+ * Handles 429 with Retry-After backoff (one retry).
+ */
+export async function getMovieWithCredits(id, token) {
+  const url = `${TMDB_BASE}/movie/${id}?append_to_response=credits`;
+  const r = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+
+  if (r.status === 429) {
+    const retry = Number(r.headers.get('Retry-After')) || 1;
+    await new Promise((res) => setTimeout(res, retry * 1000));
+    return getMovieWithCredits(id, token);
+  }
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`TMDB movie ${id} failed: HTTP ${r.status}`);
+
+  const data = await r.json();
+  const directors = (data.credits?.crew || [])
+    .filter((c) => c.job === 'Director')
+    .map((c) => c.name);
+
+  return {
+    genres: (data.genres || []).map((g) => g.name),
+    director: directors[0] || null,
+    directors,
+    runtime: data.runtime || null,
+    original_language: data.original_language || null,
+    release_date: data.release_date || null,
+  };
+}

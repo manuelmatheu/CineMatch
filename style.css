@@ -803,6 +803,32 @@
   color: var(--bone-500);
 }
 
+/* === Taste-profile build progress (shown during enrichment) ============ */
+.m-taste__progress {
+  width: 100%;
+  max-width: 280px;
+  margin-top: 12px;
+}
+.m-taste__progress-track {
+  height: 3px;
+  background: var(--ink-700);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.m-taste__progress-fill {
+  height: 100%;
+  background: var(--amber-500);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.m-taste__progress-label {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--bone-400);
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
 /* === Empty state ====================================================== */
 .m-empty {
   padding: 48px 24px 32px;

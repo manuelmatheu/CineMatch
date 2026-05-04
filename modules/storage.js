@@ -44,6 +44,16 @@ export const storage = {
   },
   setLastSync: (ts) => ls.setItem(KEYS.lastSync, String(ts)),
 
+  getTasteProfile: () => {
+    try {
+      const raw = ls.getItem(KEYS.tasteProfile);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+  setTasteProfile: (p) => ls.setItem(KEYS.tasteProfile, JSON.stringify(p)),
+
   isOnboarded: () => Boolean(
     ls.getItem(KEYS.username) && ls.getItem(KEYS.token)
   ),
