@@ -6,7 +6,7 @@ CineMatch is a personal movie recommendation web app. It reads the user's Letter
 
 Deployed via GitHub + Vercel. Vanilla JS, no framework, no bundler.
 
-**Current state (Phase 0 shipped):** the project shell is up and renders all 8 mobile-first screens against fixture data — no real Letterboxd / TMDB integration yet. The "Project Structure" section below is now mostly real; only `modules/letterboxd.js`, `modules/tmdb.js`, `modules/taste.js`, `modules/recommendations.js`, and `api/rss-proxy.js` remain to be built (Phase 1+).
+**Current state (Phases 0–6 shipped):** every screen reads live data. Onboarding, RSS+CSV ingestion, TMDB resolution + enrichment, taste profile, recommendations engine, and upcoming-releases filter are all wired. Phase 6 polish adds: manual "Sync with Letterboxd" + CSV re-upload + recommendations export + reset-everything in the More screen, a toast notification system (`modules/notify.js`), TMDB-auth-error detection in the resolver, and PWA install (manifest + SVG icon + service worker that caches the app shell + TMDB poster images while letting API traffic through). Modules added in Phase 6: `modules/sync.js`, `modules/notify.js`. Files added: `manifest.webmanifest`, `service-worker.js`, `icons/icon.svg`.
 
 ## Design system
 

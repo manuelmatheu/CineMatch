@@ -21,6 +21,7 @@ import { searchMovie, getMovieWithCredits } from './tmdb.js';
 import { buildTasteProfile } from './taste.js';
 import { buildRecommendations } from './recommendations.js';
 import { buildUpcoming } from './upcoming.js';
+import { notify } from './notify.js';
 
 const MIN_DELAY_MS = 300;
 const SAVE_EVERY = 10;
@@ -82,6 +83,11 @@ async function runPosterPass() {
       }
     } catch (err) {
       console.warn('[CineMatch] poster lookup failed for', entry.title, err);
+      if (isAuthError(err)) {
+        notify('TMDB token rejected — re-enter it in More → Re-run setup.', 'error', { dismissMs: 6000 });
+        storage.setHistory(history);
+        return;
+      }
     }
 
     done++;
@@ -130,6 +136,12 @@ async function runEnrichmentPass() {
       }
     } catch (err) {
       console.warn('[CineMatch] enrichment failed for', entry.title, err);
+      if (isAuthError(err)) {
+        notify('TMDB token rejected — re-enter it in More → Re-run setup.', 'error', { dismissMs: 6000 });
+        storage.setHistory(history);
+        rebuildTasteProfile();
+        return;
+      }
     }
 
     done++;
@@ -144,6 +156,11 @@ async function runEnrichmentPass() {
   storage.setHistory(history);
   rebuildTasteProfile();
   emit({ phase: 'enrichment', done, total: todo.length, finished: true });
+}
+
+function isAuthError(err) {
+  const msg = String(err?.message || '');
+  return msg.includes('HTTP 401') || msg.includes('HTTP 403');
 }
 
 function rebuildTasteProfile() {

@@ -599,28 +599,53 @@ export function moreScreen() {
   const token = storage.getToken();
   const history = storage.getHistory();
   const lastSync = storage.getLastSync();
+  const profile = storage.getTasteProfile();
+  const recsBlob = storage.getRecommendations();
+  const upcomingBlob = storage.getUpcoming();
 
   const tokenMask = token ? `•••• ${token.slice(-4)}` : 'Not set';
   const historyLabel = history.length ? `${history.length} films` : 'Not loaded';
-  const syncLabel = lastSync
-    ? relativeTime(Date.now() - lastSync) + ' ago'
-    : 'Never';
+  const syncLabel = lastSync ? relativeTime(Date.now() - lastSync) + ' ago' : 'Never';
+
+  const resolved = history.filter((e) => typeof e.tmdb_id === 'number' && e.tmdb_id > 0).length;
+  const enriched = history.filter((e) => Array.isArray(e.genres)).length;
+  const resolvedLabel = history.length
+    ? `${resolved} of ${history.length}`
+    : '—';
+  const enrichedLabel = history.length
+    ? `${enriched} of ${history.length}`
+    : '—';
+
+  const profileLabel = profile?.ready
+    ? `Ready · ${profile.ratedFilms} rated`
+    : profile
+      ? `Need ${10 - (profile.ratedFilms || 0)} more rated`
+      : 'Not built';
+
+  const recsLabel = recsBlob?.builtAt
+    ? `${recsBlob.items?.length || 0} picks · ${relativeTime(Date.now() - recsBlob.builtAt)} ago`
+    : 'Not built';
+  const upcomingLabel = upcomingBlob?.builtAt
+    ? `${upcomingBlob.items?.length || 0} films · ${relativeTime(Date.now() - upcomingBlob.builtAt)} ago`
+    : 'Not built';
 
   const rows = [
     ['Letterboxd',    username ? `@${username}` : 'Not set'],
     ['TMDB token',    tokenMask],
     ['Watch history', historyLabel],
     ['Last sync',     syncLabel],
+    ['Resolved',      resolvedLabel],
+    ['Enriched',      enrichedLabel],
+    ['Taste profile', profileLabel],
+    ['Recommendations', recsLabel],
+    ['Upcoming',      upcomingLabel],
     ['Region',        'Argentina'],
-    ['Cache',         'Phase 2+'],
-    ['Taste profile', 'Phase 3+'],
   ].map(([label, value]) => `
     <div class="m-settings__row">
       <div>
         <div class="m-settings__row-label">${esc(label)}</div>
         <div class="m-settings__row-value">${esc(value)}</div>
       </div>
-      <span class="m-settings__chevron">›</span>
     </div>
   `).join('');
 
@@ -628,7 +653,40 @@ export function moreScreen() {
     ${header({ eyebrow: 'Connections + data', title: 'More' })}
     <div class="m-settings">
       ${rows}
-      <button class="m-btn m-btn--ghost m-settings__rerun" data-action="open-setup">Re-run setup</button>
+
+      <div class="m-settings__group">
+        <div class="m-settings__group-label">Sync</div>
+        <button class="m-btn m-btn--ghost m-settings__action"
+                data-action="sync-letterboxd"
+                ${username ? '' : 'disabled'}>
+          ↻ Sync with Letterboxd
+        </button>
+        <label class="m-btn m-btn--ghost m-settings__action" for="more-csv-input">
+          ⇧ Re-upload CSV
+        </label>
+        <input id="more-csv-input" type="file" accept=".csv,text/csv" hidden
+               data-action="more-csv-pick" />
+      </div>
+
+      <div class="m-settings__group">
+        <div class="m-settings__group-label">Export</div>
+        <button class="m-btn m-btn--ghost m-settings__action"
+                data-action="export-recs"
+                ${recsBlob?.items?.length ? '' : 'disabled'}>
+          ↓ Export recommendations (CSV)
+        </button>
+      </div>
+
+      <div class="m-settings__group">
+        <div class="m-settings__group-label">Account</div>
+        <button class="m-btn m-btn--ghost m-settings__action" data-action="open-setup">
+          Re-run setup
+        </button>
+        <button class="m-btn m-btn--ghost m-settings__action m-settings__action--danger"
+                data-action="reset-app">
+          Reset everything
+        </button>
+      </div>
     </div>
   `;
   return mobileShell({ content, footerActive: 'more' });

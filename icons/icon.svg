@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CineMatch">
+  <!-- Maskable-safe: bleed background + content inside the inner 80% circle. -->
+  <rect width="512" height="512" fill="#0a0a0c"/>
+  <!-- Concentric film-aperture rings, in bone tones, faintly visible. -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#2a2a2d" stroke-width="1.5"/>
+  <circle cx="256" cy="256" r="155" fill="none" stroke="#1a1a1c" stroke-width="1"/>
+  <!-- Projector-amber play triangle, optically centered (geometric centre nudged right). -->
+  <path d="M 196 156 L 196 356 L 360 256 Z" fill="#e6a563"/>
+</svg>

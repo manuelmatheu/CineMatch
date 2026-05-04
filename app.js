@@ -16,6 +16,13 @@ import { fetchRssEntries, parseCsv, mergeHistory } from './modules/letterboxd.js
 import { resolveHistory, RESOLVER_PROGRESS_EVENT } from './modules/resolver.js';
 import { buildRecommendations, RECOMMENDATIONS_PROGRESS_EVENT } from './modules/recommendations.js';
 import { buildUpcoming, UPCOMING_PROGRESS_EVENT } from './modules/upcoming.js';
+import {
+  syncWithLetterboxd,
+  importCsvFile,
+  exportRecommendationsCsv,
+  resetEverything,
+} from './modules/sync.js';
+import { notify } from './modules/notify.js';
 
 const root = document.getElementById('root');
 
@@ -235,14 +242,25 @@ root.addEventListener('click', (e) => {
       navigate(`/detail/${target.dataset.tmdbId}`);
       break;
     case 'refresh-recs':
-      buildRecommendations().catch((err) =>
-        console.warn('[CineMatch] manual rec rebuild failed', err)
-      );
+      buildRecommendations().catch((err) => {
+        console.warn('[CineMatch] manual rec rebuild failed', err);
+        notify(err.message || 'Could not rebuild recommendations.', 'error');
+      });
       break;
     case 'refresh-upcoming':
-      buildUpcoming({ force: true }).catch((err) =>
-        console.warn('[CineMatch] manual upcoming rebuild failed', err)
-      );
+      buildUpcoming({ force: true }).catch((err) => {
+        console.warn('[CineMatch] manual upcoming rebuild failed', err);
+        notify(err.message || 'Could not refresh upcoming.', 'error');
+      });
+      break;
+    case 'sync-letterboxd':
+      handleSyncLetterboxd(target);
+      break;
+    case 'export-recs':
+      handleExportRecs();
+      break;
+    case 'reset-app':
+      handleResetApp();
       break;
     case 'close-film':
       if (window.history.length > 1) window.history.back();
@@ -274,10 +292,83 @@ root.addEventListener('click', (e) => {
   }
 });
 
+// === More-screen action handlers =====================================
+async function handleSyncLetterboxd(btn) {
+  const original = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+  }
+  try {
+    const { added, ratingChanged } = await syncWithLetterboxd();
+    if (added === 0 && ratingChanged === 0) {
+      notify('Already in sync — nothing new on Letterboxd.', 'info');
+    } else {
+      const parts = [];
+      if (added > 0) parts.push(`${added} new`);
+      if (ratingChanged > 0) parts.push(`${ratingChanged} re-rated`);
+      notify(`Synced ${parts.join(' · ')}.`, 'success');
+    }
+    render();
+  } catch (err) {
+    notify(err.message || 'Sync failed.', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (original) btn.textContent = original;
+    }
+  }
+}
+
+async function handleMoreCsvPick(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  try {
+    const { added, ratingChanged } = await importCsvFile(file);
+    if (added === 0 && ratingChanged === 0) {
+      notify('CSV merged — no new entries.', 'info');
+    } else {
+      const parts = [];
+      if (added > 0) parts.push(`${added} new`);
+      if (ratingChanged > 0) parts.push(`${ratingChanged} re-rated`);
+      notify(`Imported ${parts.join(' · ')}.`, 'success');
+    }
+    render();
+  } catch (err) {
+    notify(err.message || 'CSV import failed.', 'error');
+  } finally {
+    // Clear the input so picking the same file again still fires `change`.
+    input.value = '';
+  }
+}
+
+function handleExportRecs() {
+  try {
+    const n = exportRecommendationsCsv();
+    notify(`Exported ${n} recommendations.`, 'success');
+  } catch (err) {
+    notify(err.message || 'Export failed.', 'error');
+  }
+}
+
+function handleResetApp() {
+  const ok = window.confirm(
+    'Reset everything?\n\nThis wipes your Letterboxd link, TMDB token, history, taste profile, recommendations, and upcoming cache. You will be returned to setup.'
+  );
+  if (!ok) return;
+  resetEverything();
+  notify('Reset complete.', 'info');
+  window.location.hash = '/setup/1';
+}
+
 // File picker feedback for the setup wizard CSV step.
 // Direct DOM mutation (no re-render) so we don't blow away the picked file.
 root.addEventListener('change', (e) => {
   const target = e.target;
+  if (target.dataset && target.dataset.action === 'more-csv-pick') {
+    handleMoreCsvPick(target);
+    return;
+  }
   if (target.dataset && target.dataset.action === 'csv-pick') {
     const file = target.files && target.files[0];
     const label = document.getElementById('setup-csv-label');
@@ -315,6 +406,18 @@ window.addEventListener(RECOMMENDATIONS_PROGRESS_EVENT, () => {
 window.addEventListener(UPCOMING_PROGRESS_EVENT, () => {
   if (parseHash().name === 'upcoming') render();
 });
+
+// Service worker — caches the app shell + TMDB poster images so the app
+// keeps working offline (against the localStorage data we already hold).
+// Skip on file:// previews and HTTP loopback edge cases where SW won't
+// register cleanly anyway.
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch((err) => {
+      console.warn('[CineMatch] SW registration failed', err);
+    });
+  });
+}
 
 // Boot.
 gateOrRender();

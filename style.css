@@ -920,12 +920,12 @@
 }
 
 /* === Settings (More) ================================================= */
-.m-settings { padding: 8px 20px 32px; display: flex; flex-direction: column; }
+.m-settings { padding: 8px 20px 40px; display: flex; flex-direction: column; }
 .m-settings__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0;
+  padding: 14px 0;
   border-bottom: var(--hairline-soft);
 }
 .m-settings__row-label {
@@ -942,12 +942,85 @@
   font-size: 17px;
   color: var(--bone-100);
 }
-.m-settings__chevron {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--bone-400);
+.m-settings__group {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.m-settings__rerun { margin-top: 24px; }
+.m-settings__group-label {
+  font-family: var(--font-mono);
+  font-size: var(--t-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--bone-500);
+  margin-bottom: 2px;
+}
+.m-settings__action {
+  width: 100%;
+  padding: 14px 16px;
+  text-align: center;
+}
+.m-settings__action[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.m-settings__action--danger {
+  color: var(--rust-400, #d97757);
+  border-color: color-mix(in oklch, var(--rust-400, #d97757) 40%, transparent);
+}
+.m-settings__action--danger:hover { background: color-mix(in oklch, var(--rust-400, #d97757) 10%, transparent); }
+
+/* === Toast notifications ============================================= */
+.m-toast-host {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); /* clear the tabbar */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+}
+.m-toast {
+  pointer-events: auto;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--ink-700);
+  color: var(--bone-100);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  border: var(--hairline);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity var(--dur, 200ms) var(--ease-out, ease-out),
+    transform var(--dur, 200ms) var(--ease-out, ease-out);
+  cursor: pointer;
+}
+.m-toast.is-shown { opacity: 1; transform: translateY(0); }
+.m-toast.is-leaving { opacity: 0; transform: translateY(4px); }
+.m-toast--success {
+  border-color: color-mix(in oklch, var(--amber-500) 60%, transparent);
+  background: color-mix(in oklch, var(--amber-500) 14%, var(--ink-800));
+  color: var(--bone-100);
+}
+.m-toast--error {
+  border-color: color-mix(in oklch, var(--rust-400, #d97757) 60%, transparent);
+  background: color-mix(in oklch, var(--rust-400, #d97757) 16%, var(--ink-800));
+  color: var(--bone-100);
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-toast { transition: opacity 120ms linear; transform: none; }
+  .m-toast.is-shown, .m-toast.is-leaving { transform: none; }
+}
 
 /* === Setup wizard ==================================================== */
 .m-setup { padding: 60px 24px 24px; display: flex; flex-direction: column; min-height: 100%; }
@@ -1183,12 +1256,6 @@
 .m-btn { transition: opacity var(--dur) var(--ease-out), transform var(--dur) var(--ease-out); }
 .m-btn:active { transform: translateY(1px); opacity: 0.9; }
 
-/* --- Settings rows: hover only when row becomes interactive in Phase 1+ - */
-.m-settings__row { transition: color var(--dur) var(--ease-out); }
-@media (hover: hover) {
-  .m-settings__row[data-action]:hover .m-settings__row-value { color: var(--amber-400); }
-  .m-settings__row[data-action]:hover .m-settings__chevron    { color: var(--bone-200); }
-}
 
 /* --- Focus rings on full-card buttons sit cleaner inside the card ---- */
 .m-tonight:focus-visible,
