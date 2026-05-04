@@ -15,6 +15,7 @@ import { validateToken } from './modules/tmdb.js';
 import { fetchRssEntries, parseCsv, mergeHistory } from './modules/letterboxd.js';
 import { resolveHistory, RESOLVER_PROGRESS_EVENT } from './modules/resolver.js';
 import { buildRecommendations, RECOMMENDATIONS_PROGRESS_EVENT } from './modules/recommendations.js';
+import { buildUpcoming, UPCOMING_PROGRESS_EVENT } from './modules/upcoming.js';
 
 const root = document.getElementById('root');
 
@@ -97,7 +98,23 @@ function findFilmById(id) {
     };
   }
 
-  // Fixture fallback (used by Coming Soon while Phase 5 isn't real yet).
+  // Live upcoming (Phase 5) — also keyed by tmdb_id.
+  const upcomingBlob = storage.getUpcoming();
+  const fromUpcoming = upcomingBlob?.items?.find((u) => u.tmdb_id === id);
+  if (fromUpcoming) {
+    return {
+      id: fromUpcoming.tmdb_id,
+      title: fromUpcoming.title,
+      year: fromUpcoming.year,
+      poster_path: fromUpcoming.poster_path,
+      score: 0.85, // upcoming films don't have a "match score" — use a neutral display value
+      genres: fromUpcoming.genres,
+      overview: fromUpcoming.overview,
+      tagline: `Releases ${fromUpcoming.release_date}`,
+    };
+  }
+
+  // Fixture fallback (legacy — used while older /detail/{id} links resolve).
   if (CINEMATCH_DATA.hero.id === id) return CINEMATCH_DATA.hero;
   return (
     CINEMATCH_DATA.recommendations.find((f) => f.id === id) ||
@@ -222,6 +239,11 @@ root.addEventListener('click', (e) => {
         console.warn('[CineMatch] manual rec rebuild failed', err)
       );
       break;
+    case 'refresh-upcoming':
+      buildUpcoming({ force: true }).catch((err) =>
+        console.warn('[CineMatch] manual upcoming rebuild failed', err)
+      );
+      break;
     case 'close-film':
       if (window.history.length > 1) window.history.back();
       else navigate('/feed');
@@ -288,6 +310,11 @@ window.addEventListener(RESOLVER_PROGRESS_EVENT, () => {
 window.addEventListener(RECOMMENDATIONS_PROGRESS_EVENT, () => {
   if (parseHash().name === 'feed') render();
 });
+// Upcoming list builds in one go (3 pages); re-render when each page lands
+// so the count grows instead of jumping from 0 to "all".
+window.addEventListener(UPCOMING_PROGRESS_EVENT, () => {
+  if (parseHash().name === 'upcoming') render();
+});
 
 // Boot.
 gateOrRender();
@@ -297,5 +324,12 @@ gateOrRender();
 // finished setup before this build shipped), kick the resolver again.
 if (storage.isOnboarded()) {
   const hasUnresolved = storage.getHistory().some((e) => e.tmdb_id == null);
-  if (hasUnresolved) resolveHistory();
+  if (hasUnresolved) {
+    resolveHistory();
+  } else {
+    // No resolution work to do, but the upcoming-releases cache may have
+    // expired since last visit (7-day TTL). buildUpcoming is a no-op when
+    // the cache is fresh, so calling it on every boot is cheap.
+    buildUpcoming().catch(() => {});
+  }
 }

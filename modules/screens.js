@@ -278,38 +278,90 @@ export function detailScreen(film) {
 }
 
 // =====================================================================
-// UPCOMING — calendar-day list with countdown + reason
+// UPCOMING — calendar-day list with countdown + reason. Reads the live
+// upcoming list (Phase 5) filtered by the user's top taste genres.
 // =====================================================================
 export function upcomingScreen() {
-  const data = CINEMATCH_DATA;
-  const rows = data.upcoming.map((film) => {
-    const date = new Date(film.releaseDate);
+  const blob = storage.getUpcoming();
+  const profile = storage.getTasteProfile();
+  const history = storage.getHistory();
+
+  // === Empty: no setup yet ===
+  if (history.length === 0) {
+    const content = `
+      ${header({ eyebrow: 'No history yet', title: 'Coming Soon' })}
+      <div class="m-empty">
+        <div class="m-empty__title">Nothing to surface</div>
+        <p class="m-empty__body">Complete setup so we know your taste — then upcoming releases get filtered to films you'll actually want to see.</p>
+        <button class="m-btn m-btn--ghost" data-action="open-setup">Open setup</button>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'upcoming' });
+  }
+
+  // === Building: profile not ready, or upcoming hasn't run yet ===
+  if (!profile?.ready || !blob) {
+    const message = !profile?.ready
+      ? 'Resolving films against TMDB to learn your taste — upcoming list builds right after.'
+      : 'Taste profile ready — fetching the next 60 days of releases…';
+    const content = `
+      ${header({ eyebrow: 'Tuning', title: 'Coming Soon' })}
+      <div class="m-empty">
+        <div class="m-empty__title">Almost there</div>
+        <p class="m-empty__body">${esc(message)}</p>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'upcoming' });
+  }
+
+  // === Edge: query returned nothing in the user's region ===
+  if (!blob.items || blob.items.length === 0) {
+    const content = `
+      ${header({ eyebrow: `Region ${blob.region || 'AR'} · 0 matches`, title: 'Coming Soon' })}
+      <div class="m-empty">
+        <div class="m-empty__title">Quiet stretch</div>
+        <p class="m-empty__body">No upcoming releases in your region match your top genres right now. Check back in a few days — TMDB updates this list weekly.</p>
+        <button class="m-btn m-btn--ghost" data-action="refresh-upcoming">Refresh now</button>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'upcoming' });
+  }
+
+  // === Live ===
+  const refreshButton = `<button class="m-header__action" data-action="refresh-upcoming" aria-label="Refresh upcoming">↻</button>`;
+  const today = new Date();
+  const rows = blob.items.map((film) => {
+    const date = new Date(film.release_date);
     const month = date.toLocaleString('en', { month: 'short' }).toUpperCase();
     const day = date.getDate();
-    const days = Math.round((date - TODAY) / (1000 * 60 * 60 * 24));
+    const days = Math.max(0, Math.round((date - today) / (1000 * 60 * 60 * 24)));
+    const countdownLabel = days === 0 ? 'TODAY' : `IN ${days}D`;
+    const genresLine = film.genres?.length
+      ? film.genres.slice(0, 2).join(' · ').toUpperCase()
+      : '';
     return `
       <button class="m-upcoming__row"
-              data-action="open-film"
-              data-film-id="${film.id}"
-              aria-label="${esc(film.title)}, releases ${month} ${day}, in ${days} days">
+              data-action="open-rec"
+              data-tmdb-id="${film.tmdb_id}"
+              aria-label="${esc(film.title)}, releases ${month} ${day}, in ${days} days, ${esc(film.reason)}">
         <div class="m-upcoming__date" aria-hidden="true">
           <div class="m-upcoming__month">${month}</div>
           <div class="m-upcoming__day">${day}</div>
-          <div class="m-upcoming__countdown">IN ${days}D</div>
+          <div class="m-upcoming__countdown">${countdownLabel}</div>
         </div>
-        <div>${poster({ title: film.title, year: film.year })}</div>
+        <div>${poster({ title: film.title, year: film.year, posterPath: film.poster_path })}</div>
         <div class="m-min-w-0">
           <div class="m-upcoming__title">${esc(film.title)}</div>
-          <div class="m-upcoming__director">${esc(film.director.toUpperCase())}</div>
+          ${genresLine ? `<div class="m-upcoming__director">${esc(genresLine)}</div>` : ''}
           <div class="m-upcoming__reason">→ ${esc(film.reason)}</div>
         </div>
       </button>
     `;
   }).join('');
 
+  const eyebrow = `Region ${blob.region} · ${blob.items.length} of ${blob.sourceCount} upcoming match your taste`;
   const content = `
-    ${header({ eyebrow: 'Filtered to your taste · region AR', title: 'Coming Soon' })}
-    ${fixtureNote('Upcoming releases land in Phase 5 once the taste profile drives the filter.')}
+    ${header({ eyebrow, title: 'Coming Soon', right: refreshButton })}
     <div class="m-upcoming-list">${rows}</div>
   `;
   return mobileShell({ content, footerActive: 'upcoming' });

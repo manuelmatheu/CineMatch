@@ -21,6 +21,7 @@ export const KEYS = {
   tasteProfile: 'cinematch_taste_profile',
   tmdbCache: 'cinematch_tmdb_cache',
   recommendations: 'cinematch_recommendations',
+  upcoming: 'cinematch_upcoming',
 };
 
 export const storage = {
@@ -64,6 +65,16 @@ export const storage = {
     }
   },
   setRecommendations: (r) => ls.setItem(KEYS.recommendations, JSON.stringify(r)),
+
+  getUpcoming: () => {
+    try {
+      const raw = ls.getItem(KEYS.upcoming);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+  setUpcoming: (u) => ls.setItem(KEYS.upcoming, JSON.stringify(u)),
 
   isOnboarded: () => Boolean(
     ls.getItem(KEYS.username) && ls.getItem(KEYS.token)

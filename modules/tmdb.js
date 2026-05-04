@@ -7,6 +7,21 @@ const TMDB_BASE = 'https://api.themoviedb.org/3';
 const IMG_BASE  = 'https://image.tmdb.org/t/p/';
 
 /**
+ * TMDB movie genre IDs → names. IDs are stable; hardcoding saves a
+ * /genre/movie/list roundtrip on every cold boot. Used by both the
+ * recommendations engine and the upcoming-releases filter to map the
+ * `genre_ids` field on lightweight movie list responses to the same
+ * genre names that /movie/{id} returns in its enriched form.
+ */
+export const TMDB_GENRES = {
+  28: 'Action', 12: 'Adventure', 16: 'Animation', 35: 'Comedy',
+  80: 'Crime', 99: 'Documentary', 18: 'Drama', 10751: 'Family',
+  14: 'Fantasy', 36: 'History', 27: 'Horror', 10402: 'Music',
+  9648: 'Mystery', 10749: 'Romance', 878: 'Science Fiction',
+  10770: 'TV Movie', 53: 'Thriller', 10752: 'War', 37: 'Western',
+};
+
+/**
  * Validates a TMDB read access token by hitting the lightweight /configuration
  * endpoint. Returns { ok: true } on success, { ok: false, status, message } otherwise.
  */
@@ -165,6 +180,31 @@ export async function getRecommendations(id, token) {
   }
   if (r.status === 404) return [];
   if (!r.ok) throw new Error(`TMDB recommendations for ${id} failed: HTTP ${r.status}`);
+  const data = await r.json();
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+/**
+ * Fetches a page of TMDB's upcoming-releases list for a given region.
+ * Each page returns ~20 entries with the same lightweight shape as
+ * /search/movie results (no director, no genre names — just genre_ids).
+ *
+ * `region` is an ISO 3166-1 country code (e.g. "AR", "US"). The list is
+ * scoped to films releasing in that region's theatres, which keeps it
+ * relevant rather than showing US-only releases to non-US users.
+ */
+export async function getUpcoming(region, page, token) {
+  const params = new URLSearchParams({ region, page: String(page) });
+  const url = `${TMDB_BASE}/movie/upcoming?${params}`;
+  const r = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (r.status === 429) {
+    const retry = Number(r.headers.get('Retry-After')) || 1;
+    await new Promise((res) => setTimeout(res, retry * 1000));
+    return getUpcoming(region, page, token);
+  }
+  if (!r.ok) throw new Error(`TMDB upcoming page ${page} failed: HTTP ${r.status}`);
   const data = await r.json();
   return Array.isArray(data.results) ? data.results : [];
 }
