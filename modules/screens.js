@@ -4,6 +4,7 @@
 
 import { CINEMATCH_DATA, TODAY } from './data.js';
 import { esc, poster, matchBadge, header, mobileShell, sectionHead, stars } from './ui.js';
+import { storage } from './storage.js';
 
 // =====================================================================
 // FEED — Tonight's pick + horizontal rails + 2-col grid
@@ -378,13 +379,25 @@ export function diaryScreen() {
 // MORE / SETTINGS — connections + data status
 // =====================================================================
 export function moreScreen() {
+  const username = storage.getUsername();
+  const token = storage.getToken();
+  const history = storage.getHistory();
+  const lastSync = storage.getLastSync();
+
+  const tokenMask = token ? `•••• ${token.slice(-4)}` : 'Not set';
+  const historyLabel = history.length ? `${history.length} films` : 'Not loaded';
+  const syncLabel = lastSync
+    ? relativeTime(Date.now() - lastSync) + ' ago'
+    : 'Never';
+
   const rows = [
-    ['Letterboxd',    '@manuelmatheu'],
-    ['TMDB token',    '•••• Mxng'],
-    ['CSV history',   '847 films'],
+    ['Letterboxd',    username ? `@${username}` : 'Not set'],
+    ['TMDB token',    tokenMask],
+    ['Watch history', historyLabel],
+    ['Last sync',     syncLabel],
     ['Region',        'Argentina'],
-    ['Cache',         '412 films · 24h TTL'],
-    ['Taste profile', 'Recomputed 12m ago'],
+    ['Cache',         'Phase 2+'],
+    ['Taste profile', 'Phase 3+'],
   ].map(([label, value]) => `
     <div class="m-settings__row">
       <div>
@@ -405,6 +418,17 @@ export function moreScreen() {
   return mobileShell({ content, footerActive: 'more' });
 }
 
+// Compact relative-time label for the More screen ("12m", "3h", "2d").
+function relativeTime(ms) {
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h`;
+  return `${Math.round(hr / 24)}d`;
+}
+
 // =====================================================================
 // SETUP — 3-step onboarding wizard
 // =====================================================================
@@ -421,21 +445,35 @@ export function setupScreen(step = 1) {
     <div class="m-setup__progress-step ${i + 1 <= step ? 'is-active' : ''}"></div>
   `).join('');
 
+  // Pre-fill from any previously-saved values so users can resume mid-setup.
+  const savedUsername = esc(storage.getUsername() || '');
+
   let body = '';
+  let continueAttrs = '';
+
   if (step === 1) {
     body = `
       <h1 class="m-setup__title">Who are you<br/>on Letterboxd?</h1>
       <p class="m-setup__lede">We'll fetch your last ~50 watches from your public RSS feed.</p>
-      <div class="m-setup__field">
+      <label class="m-setup__field" for="setup-username">
         <span class="m-setup__field-prefix">letterboxd.com/</span>
-        <span class="m-setup__field-value">manuelmatheu</span>
-        <span class="m-setup__caret"></span>
-      </div>
+        <input type="text"
+               id="setup-username"
+               class="m-setup__field-input"
+               autocomplete="off"
+               autocapitalize="off"
+               autocorrect="off"
+               spellcheck="false"
+               placeholder="your-username"
+               value="${savedUsername}" />
+      </label>
+      <div class="m-setup__error" id="setup-error" hidden></div>
     `;
+    continueAttrs = `data-action="setup-1-continue"`;
   } else if (step === 2) {
     body = `
       <h1 class="m-setup__title">Paste your<br/>TMDB token</h1>
-      <p class="m-setup__lede">Free + non-commercial. Stored in localStorage only — never on a server.</p>
+      <p class="m-setup__lede">Free + non-commercial. Stored in localStorage only — never on a server. <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener" style="color: var(--amber-400);">Get one →</a></p>
       <label class="visually-hidden" for="setup-tmdb-token">TMDB read access token</label>
       <textarea id="setup-tmdb-token"
                 class="m-setup__token"
@@ -444,11 +482,13 @@ export function setupScreen(step = 1) {
                 autocapitalize="off"
                 autocomplete="off"
                 placeholder="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI…"></textarea>
+      <div class="m-setup__error" id="setup-error" hidden></div>
     `;
+    continueAttrs = `data-action="setup-2-continue"`;
   } else {
     body = `
       <h1 class="m-setup__title">Drop your<br/>CSV export</h1>
-      <p class="m-setup__lede">Optional but recommended. Gives us your full history, not just the recent 50.</p>
+      <p class="m-setup__lede">Optional but recommended. Gives us your full history, not just the recent 50. Export from <a href="https://letterboxd.com/data/" target="_blank" rel="noopener" style="color: var(--amber-400);">letterboxd.com/data/</a></p>
       <label class="m-setup__drop" for="setup-csv-input" id="setup-csv-label">
         <div class="m-setup__drop-prompt">Tap to choose CSV</div>
         <div class="m-setup__drop-sub">stays on your device</div>
@@ -458,13 +498,10 @@ export function setupScreen(step = 1) {
                accept=".csv,text/csv"
                data-action="csv-pick" />
       </label>
+      <div class="m-setup__error" id="setup-error" hidden></div>
     `;
+    continueAttrs = `data-action="setup-3-continue"`;
   }
-
-  const nextStep = step < total ? step + 1 : null;
-  const continueAction = nextStep
-    ? `data-action="setup-step" data-step="${nextStep}"`
-    : `data-action="finish-setup"`;
 
   const content = `
     <div class="m-setup">
@@ -474,8 +511,8 @@ export function setupScreen(step = 1) {
       <div class="eyebrow eyebrow--mb-sm">Step ${current.n} · ${current.label}</div>
       ${body}
       <div class="m-setup__footer">
-        <button class="m-btn m-btn--bone" ${continueAction}>Continue →</button>
-        ${step === 3 ? `<button class="m-btn m-btn--text" data-action="finish-setup">Skip for now</button>` : ''}
+        <button class="m-btn m-btn--bone" ${continueAttrs} id="setup-continue">Continue →</button>
+        ${step === 3 ? `<button class="m-btn m-btn--text" data-action="setup-3-skip">Skip for now</button>` : ''}
       </div>
     </div>
   `;

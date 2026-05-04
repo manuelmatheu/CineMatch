@@ -1,5 +1,4 @@
 // CineMatch app entry — state, hash routing, render, event delegation.
-// Phase 0 prototype against fixture data. Real Letterboxd/TMDB integration lands in Phase 1+.
 
 import { CINEMATCH_DATA } from './modules/data.js';
 import {
@@ -11,10 +10,12 @@ import {
   moreScreen,
   setupScreen,
 } from './modules/screens.js';
+import { storage } from './modules/storage.js';
+import { validateToken } from './modules/tmdb.js';
+import { fetchRssEntries, parseCsv, mergeHistory } from './modules/letterboxd.js';
 
 const root = document.getElementById('root');
 
-// Single tab routes — anything not in this map is treated as a special route.
 const TAB_ROUTES = {
   feed: feedScreen,
   upcoming: upcomingScreen,
@@ -23,7 +24,7 @@ const TAB_ROUTES = {
   more: moreScreen,
 };
 
-// === Routing =========================================================
+// === Routing ==========================================================
 // Hash format examples: "", "#/", "#/upcoming", "#/detail/3", "#/setup/2"
 function parseHash() {
   const raw = window.location.hash.replace(/^#\/?/, '');
@@ -37,11 +38,22 @@ function parseHash() {
 
 function navigate(path) {
   if (window.location.hash === `#${path}`) {
-    // Same hash → no popstate event, force a re-render.
     render();
   } else {
     window.location.hash = path;
   }
+}
+
+// === First-run gate ===================================================
+// If the user hasn't completed onboarding, send them to setup before
+// anything else renders. They can still navigate within /setup/* though.
+function gateOrRender() {
+  const route = parseHash();
+  if (!storage.isOnboarded() && route.name !== 'setup') {
+    window.location.hash = '/setup/1';
+    return;
+  }
+  render();
 }
 
 // === Render ==========================================================
@@ -61,7 +73,6 @@ function render() {
   }
 
   root.innerHTML = html;
-  // Reset scroll on screen change so users land at the top of each view.
   const scroll = root.querySelector('.m-scroll');
   if (scroll) scroll.scrollTop = 0;
 }
@@ -75,6 +86,97 @@ function findFilmById(id) {
   );
 }
 
+// === Setup wizard helpers =============================================
+const USERNAME_PATTERN = /^[a-z0-9_-]{1,40}$/i;
+
+function showError(msg) {
+  const el = document.getElementById('setup-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+}
+function clearError() {
+  const el = document.getElementById('setup-error');
+  if (el) el.hidden = true;
+}
+function setBusy(busy, label) {
+  const btn = document.getElementById('setup-continue');
+  if (!btn) return;
+  btn.setAttribute('aria-busy', busy ? 'true' : 'false');
+  if (label) btn.textContent = label;
+  if (!busy) btn.textContent = 'Continue →';
+}
+
+async function handleSetup1Continue() {
+  clearError();
+  const input = document.getElementById('setup-username');
+  const username = (input?.value || '').trim();
+  if (!username) return showError('Enter your Letterboxd username to continue.');
+  if (!USERNAME_PATTERN.test(username)) {
+    return showError('Letterboxd usernames are letters, numbers, dashes, or underscores.');
+  }
+  storage.setUsername(username);
+  navigate('/setup/2');
+}
+
+async function handleSetup2Continue() {
+  clearError();
+  const input = document.getElementById('setup-tmdb-token');
+  const token = (input?.value || '').trim();
+  if (!token) return showError('Paste your TMDB read access token to continue.');
+
+  setBusy(true, 'Checking…');
+  const result = await validateToken(token);
+  setBusy(false);
+
+  if (!result.ok) return showError(result.message || 'Could not validate token.');
+  storage.setToken(token);
+  navigate('/setup/3');
+}
+
+async function handleSetup3Finish({ includeCsv }) {
+  clearError();
+  const username = storage.getUsername();
+  if (!username) return navigate('/setup/1');
+
+  let csvEntries = [];
+  if (includeCsv) {
+    const fileInput = document.getElementById('setup-csv-input');
+    const file = fileInput?.files?.[0];
+    if (file) {
+      try {
+        const text = await file.text();
+        csvEntries = parseCsv(text);
+      } catch (err) {
+        return showError(err.message || 'Could not read the CSV file.');
+      }
+    }
+  }
+
+  setBusy(true, 'Fetching diary…');
+  let rssEntries = [];
+  try {
+    rssEntries = await fetchRssEntries(username);
+  } catch (err) {
+    setBusy(false);
+    return showError(`${err.message}. You can still continue — we'll retry later.`);
+  }
+
+  const merged = mergeHistory(rssEntries, csvEntries);
+  storage.setHistory(merged);
+  storage.setLastSync(Date.now());
+
+  // Per Phase 1 exit criteria: log the merge result so the user can verify.
+  // eslint-disable-next-line no-console
+  console.log(
+    `[CineMatch] ${merged.length} films loaded ` +
+    `(${csvEntries.length} from CSV, ${rssEntries.length} from RSS)`
+  );
+
+  setBusy(false);
+  navigate('/feed');
+}
+
 // === Event delegation ================================================
 root.addEventListener('click', (e) => {
   const target = e.target.closest('[data-action]');
@@ -82,42 +184,41 @@ root.addEventListener('click', (e) => {
   const action = target.dataset.action;
 
   switch (action) {
-    case 'tab': {
+    case 'tab':
       navigate(`/${target.dataset.tab}`);
       break;
-    }
-    case 'open-film': {
+    case 'open-film':
       navigate(`/detail/${target.dataset.filmId}`);
       break;
-    }
-    case 'close-film': {
-      // Prefer the browser back stack so swipe-back / hardware back works.
+    case 'close-film':
       if (window.history.length > 1) window.history.back();
       else navigate('/feed');
       break;
-    }
-    case 'setup-step': {
-      navigate(`/setup/${target.dataset.step}`);
-      break;
-    }
-    case 'open-setup': {
+    case 'open-setup':
       navigate('/setup/1');
       break;
-    }
-    case 'finish-setup': {
+    case 'setup-1-continue':
+      handleSetup1Continue();
+      break;
+    case 'setup-2-continue':
+      handleSetup2Continue();
+      break;
+    case 'setup-3-continue':
+      handleSetup3Finish({ includeCsv: true });
+      break;
+    case 'setup-3-skip':
+      handleSetup3Finish({ includeCsv: false });
+      break;
+    case 'finish-setup':
       navigate('/feed');
       break;
-    }
-    case 'refresh': {
-      // No-op for the static prototype. Real RSS sync ships in Phase 1.
+    case 'refresh':
+      // No-op for the static prototype. Real RSS sync ships in Phase 1+.
       break;
-    }
     default:
       break;
   }
 });
-
-window.addEventListener('hashchange', render);
 
 // File picker feedback for the setup wizard CSV step.
 // Direct DOM mutation (no re-render) so we don't blow away the picked file.
@@ -141,5 +242,7 @@ root.addEventListener('change', (e) => {
   }
 });
 
+window.addEventListener('hashchange', render);
+
 // Boot.
-render();
+gateOrRender();

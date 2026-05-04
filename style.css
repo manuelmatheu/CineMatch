@@ -869,27 +869,54 @@
   padding: 14px;
   background: var(--ink-850);
   gap: 6px;
+  cursor: text;
+  transition: border-color var(--dur) var(--ease-out);
+}
+.m-setup__field:hover { border-color: var(--ink-500); }
+.m-setup__field:focus-within {
+  border-color: var(--amber-500);
+  box-shadow: 0 0 0 1px var(--amber-500);
 }
 .m-setup__field-prefix {
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--bone-500);
+  white-space: nowrap;
 }
-.m-setup__field-value {
+.m-setup__field-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 0;
   font-family: var(--font-body);
   font-size: 14px;
   color: var(--bone-100);
+  caret-color: var(--amber-400);
 }
-.m-setup__caret {
-  width: 1.5px;
-  height: 16px;
-  background: var(--amber-400);
-  margin-left: 1px;
-  animation: m-blink 1s infinite;
+.m-setup__field-input::placeholder { color: var(--ink-500); }
+
+/* Inline error message slot — used for TMDB validation, RSS fetch failures */
+.m-setup__error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklch, var(--danger) 50%, var(--ink-600));
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--danger) 8%, transparent);
+  color: var(--bone-100);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
 }
-@keyframes m-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+.m-setup__error[hidden] { display: none; }
+
+/* Continue button busy state (token validation, RSS fetch) */
+.m-btn[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: progress;
+  pointer-events: none;
 }
 /* Editable token field — JWTs are long, so use a small textarea for wrap. */
 .m-setup__token {
