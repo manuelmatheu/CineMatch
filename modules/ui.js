@@ -25,13 +25,29 @@ export function stars({ value, size = 11 }) {
   return `<span class="stars" style="font-size:${size}px;color:var(--amber-400);letter-spacing:0.05em;">${chars}</span>`;
 }
 
-// === Striped placeholder poster =======================================
-// Real TMDB poster URLs replace this in Phase 2+.
-export function poster({ title, year, big = false, ratio = '2 / 3', extraClass = '' }) {
-  const hue = Math.round((hashFraction(title) - 0.5) * 60); // -30..30 deg
+// === Poster ===========================================================
+// Renders a real <img> when posterPath is provided (Phase 2 resolver
+// populates it via TMDB /search/movie), falls back to a striped
+// placeholder with the title overlaid otherwise.
+export function poster({ title, year, big = false, ratio = '2 / 3', extraClass = '', posterPath = null }) {
   const ratioClass = ratio === '3 / 4' ? 'm-poster--ratio-3-4' : '';
+  const sizeClass = big ? 'm-poster--big' : '';
+
+  if (posterPath) {
+    // w342 is plenty for 2:3 cards on retina mobile; w500 for the hero.
+    const size = big ? 'w500' : 'w342';
+    const url = `https://image.tmdb.org/t/p/${size}${posterPath}`;
+    const altYear = year ? ` (${year})` : '';
+    return `
+      <div class="m-poster m-poster--real ${sizeClass} ${ratioClass} ${extraClass}">
+        <img src="${url}" alt="${esc(title)}${esc(altYear)}" loading="lazy" decoding="async" />
+      </div>
+    `;
+  }
+
+  const hue = Math.round((hashFraction(title) - 0.5) * 60); // -30..30 deg
   return `
-    <div class="m-poster ${big ? 'm-poster--big' : ''} ${ratioClass} ${extraClass}"
+    <div class="m-poster ${sizeClass} ${ratioClass} ${extraClass}"
          style="filter:hue-rotate(${hue}deg);">
       <div class="m-poster__overlay">
         <div class="m-poster__title">${esc(title)}</div>

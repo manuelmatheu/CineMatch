@@ -13,6 +13,7 @@ import {
 import { storage } from './modules/storage.js';
 import { validateToken } from './modules/tmdb.js';
 import { fetchRssEntries, parseCsv, mergeHistory } from './modules/letterboxd.js';
+import { resolveHistory, RESOLVER_PROGRESS_EVENT } from './modules/resolver.js';
 
 const root = document.getElementById('root');
 
@@ -175,6 +176,10 @@ async function handleSetup3Finish({ includeCsv }) {
 
   setBusy(false);
   navigate('/feed');
+
+  // Kick off background TMDB resolution. Doesn't block navigation; the
+  // diary screen re-renders as posters arrive.
+  resolveHistory();
 }
 
 // === Event delegation ================================================
@@ -244,5 +249,21 @@ root.addEventListener('change', (e) => {
 
 window.addEventListener('hashchange', render);
 
+// When the resolver completes a batch (every 10 entries), re-render the
+// current screen if it's the diary so newly resolved posters appear
+// without the user having to refresh. Other screens read fixture data
+// for now so they don't need this.
+window.addEventListener(RESOLVER_PROGRESS_EVENT, () => {
+  if (parseHash().name === 'diary') render();
+});
+
 // Boot.
 gateOrRender();
+
+// If the user is already onboarded and has unresolved entries from a
+// previous session (e.g. they closed the tab mid-resolution, or just
+// finished setup before this build shipped), kick the resolver again.
+if (storage.isOnboarded()) {
+  const hasUnresolved = storage.getHistory().some((e) => e.tmdb_id == null);
+  if (hasUnresolved) resolveHistory();
+}

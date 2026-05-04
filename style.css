@@ -121,7 +121,7 @@
   letter-spacing: 0.1em;
 }
 
-/* === Posters (striped placeholders) ================================== */
+/* === Posters (placeholder + real-image variants) ====================== */
 .m-poster {
   position: relative;
   width: 100%;
@@ -137,6 +137,22 @@
   );
   box-shadow: 0 12px 28px -10px rgba(0,0,0,0.7);
 }
+/* Real TMDB poster image — drop the stripe pattern; <img> fills the box. */
+.m-poster--real { background-image: none; background-color: var(--ink-800); }
+.m-poster--real img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Subtle fade-in so newly resolved posters don't pop in jarringly. */
+  animation: m-poster-fade var(--dur-slow) var(--ease-out);
+}
+@keyframes m-poster-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.m-poster--real .m-poster__overlay,
+.m-poster--real .m-poster__stamp { display: none; }
 .m-poster--big { /* hero use, larger overlay text */ }
 .m-poster--ratio-3-4 { aspect-ratio: 3 / 4; }
 .m-poster--big .m-poster__overlay { padding: 14px; }

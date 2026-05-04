@@ -371,9 +371,14 @@ export function diaryScreen() {
     return mobileShell({ content, footerActive: 'diary' });
   }
 
-  const eyebrow = lastSync
-    ? `Live · synced ${diaryRelativeTime(Date.now() - lastSync)} ago · ${history.length} films`
+  const resolved = history.filter((e) => e.tmdb_id && e.tmdb_id > 0).length;
+  const unresolved = history.length - resolved;
+  const baseLabel = lastSync
+    ? `Synced ${diaryRelativeTime(Date.now() - lastSync)} ago · ${history.length} films`
     : `${history.length} films`;
+  const eyebrow = unresolved > 0
+    ? `${baseLabel} · resolving ${unresolved} via TMDB…`
+    : baseLabel;
 
   // Diary view shows the most-recent 50 watches; full history is searchable later.
   const rows = history.slice(0, 50).map((entry) => {
@@ -386,7 +391,7 @@ export function diaryScreen() {
       : `<span class="m-diary__unrated">unrated</span>`;
     return `
       <div class="m-diary__row">
-        <div class="m-diary__poster">${poster({ title: entry.title, year: entry.year })}</div>
+        <div class="m-diary__poster">${poster({ title: entry.title, year: entry.year, posterPath: entry.poster_path })}</div>
         <div class="m-min-w-0">
           <div class="m-diary__title">${esc(entry.title)}</div>
           <div class="m-diary__meta">${entry.year ? esc(entry.year) + ' · ' : ''}${esc(dateStr)}${entry.rewatch ? ' · ↻' : ''}</div>
