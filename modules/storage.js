@@ -20,6 +20,7 @@ export const KEYS = {
   lastSync: 'cinematch_last_rss_fetch',
   tasteProfile: 'cinematch_taste_profile',
   tmdbCache: 'cinematch_tmdb_cache',
+  recommendations: 'cinematch_recommendations',
 };
 
 export const storage = {
@@ -53,6 +54,16 @@ export const storage = {
     }
   },
   setTasteProfile: (p) => ls.setItem(KEYS.tasteProfile, JSON.stringify(p)),
+
+  getRecommendations: () => {
+    try {
+      const raw = ls.getItem(KEYS.recommendations);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+  setRecommendations: (r) => ls.setItem(KEYS.recommendations, JSON.stringify(r)),
 
   isOnboarded: () => Boolean(
     ls.getItem(KEYS.username) && ls.getItem(KEYS.token)

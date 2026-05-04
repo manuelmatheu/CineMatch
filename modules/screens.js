@@ -7,107 +7,137 @@ import { esc, poster, matchBadge, header, mobileShell, sectionHead, stars, fixtu
 import { storage } from './storage.js';
 
 // =====================================================================
-// FEED — Tonight's pick + horizontal rails + 2-col grid
+// FEED — Tonight's pick + grid, sourced from the live recommendations
+// engine (Phase 4). Uses storage.getRecommendations() output.
 // =====================================================================
 export function feedScreen() {
-  const data = CINEMATCH_DATA;
-  const refreshButton = `<button class="m-header__action" data-action="refresh" aria-label="Refresh">↻</button>`;
+  const recsBlob = storage.getRecommendations();
+  const profile = storage.getTasteProfile();
+  const history = storage.getHistory();
+
+  // === Empty: setup not run / no history yet ===
+  if (history.length === 0) {
+    const content = `
+      ${header({ eyebrow: 'No history yet', title: 'CineMatch' })}
+      <div class="m-empty">
+        <div class="m-empty__title">Nothing to recommend yet</div>
+        <p class="m-empty__body">Complete setup so we can read your Letterboxd diary, then your recommendations build automatically once we know your taste.</p>
+        <button class="m-btn m-btn--ghost" data-action="open-setup">Open setup</button>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'feed' });
+  }
+
+  // === Building: profile not ready, or recs not yet computed ===
+  if (!profile?.ready || !recsBlob) {
+    const enriched = history.filter((e) => Array.isArray(e.genres)).length;
+    const total = history.length;
+    const pct = total > 0 ? Math.round((enriched / total) * 100) : 0;
+    const message = !profile?.ready
+      ? (profile?.message || 'Resolving films against TMDB to learn your taste…')
+      : 'Taste profile ready — building your recommendations…';
+    const content = `
+      ${header({ eyebrow: 'Tuning', title: 'CineMatch' })}
+      <div class="m-empty">
+        <div class="m-empty__title">Almost there</div>
+        <p class="m-empty__body">${esc(message)}</p>
+        <div class="m-taste__progress">
+          <div class="m-taste__progress-track">
+            <div class="m-taste__progress-fill" style="width:${pct}%;"></div>
+          </div>
+          <div class="m-taste__progress-label">${enriched} / ${total} films enriched</div>
+        </div>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'feed' });
+  }
+
+  // === Edge: recs built but produced no items ===
+  if (!recsBlob.items || recsBlob.items.length === 0) {
+    const content = `
+      ${header({ eyebrow: 'Nothing surfaced', title: 'CineMatch' })}
+      <div class="m-empty">
+        <div class="m-empty__title">${esc(recsBlob.message || 'No recommendations yet')}</div>
+        <p class="m-empty__body">Rate a few more films on Letterboxd at ${'★'.repeat(4)} or ${'★'.repeat(5)} — we draw recommendations from your highest-rated recent watches.</p>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'feed' });
+  }
+
+  // === Live ===
+  const items = recsBlob.items;
+  const hero = items[0];
+  const rest = items.slice(1);
+  const refreshButton = `<button class="m-header__action" data-action="refresh-recs" aria-label="Rebuild recommendations">↻</button>`;
+  const todayLabel = new Date().toLocaleDateString('en', { day: 'numeric', month: 'short' });
+  const eyebrow = `${todayLabel} · ${items.length} picks · from ${recsBlob.sourceCount} of your favourites`;
+
+  const heroMeta = [
+    hero.year ? String(hero.year) : null,
+    hero.genres?.length ? hero.genres.slice(0, 2).join(' · ').toUpperCase() : null,
+    `BECAUSE ${hero.because.toUpperCase()}`,
+  ].filter(Boolean);
 
   const tonightsPick = `
     <button class="m-tonight"
-            data-action="open-film"
-            data-film-id="${data.hero.id}"
-            aria-label="Tonight's pick: ${esc(data.hero.title)}, ${esc(data.hero.year)}, directed by ${esc(data.hero.director)}">
+            data-action="open-rec"
+            data-tmdb-id="${hero.tmdb_id}"
+            aria-label="Tonight's pick: ${esc(hero.title)}${hero.year ? ', ' + hero.year : ''}, because you loved ${esc(hero.because)}">
       <div class="m-tonight__eyebrow">▸ Tonight's pick</div>
       <div class="m-tonight__hero">
-        ${poster({ title: data.hero.title, year: data.hero.year, ratio: '3 / 4', big: true })}
+        ${poster({ title: hero.title, year: hero.year, ratio: '3 / 4', big: true, posterPath: hero.poster_path })}
         <div>
-          <h2 class="m-tonight__title">${esc(data.hero.title)}</h2>
+          <h2 class="m-tonight__title">${esc(hero.title)}</h2>
           <div class="m-tonight__meta">
-            <span>${esc(data.hero.year)}</span>
-            <span class="m-tonight__meta-sep" aria-hidden="true">/</span>
-            <span>${esc(data.hero.director.toUpperCase())}</span>
-            <span class="m-tonight__meta-sep" aria-hidden="true">/</span>
-            <span>${esc(data.hero.runtime)} MIN</span>
+            ${heroMeta.map((m, i) => `
+              ${i > 0 ? `<span class="m-tonight__meta-sep" aria-hidden="true">/</span>` : ''}
+              <span>${esc(m)}</span>
+            `).join('')}
           </div>
         </div>
         <div class="m-tonight__why">
           <div class="eyebrow">Why you'll love it</div>
-          <p>${esc(data.hero.why)}</p>
+          <p>Because <em>${esc(hero.because)}</em> was a ${'★'.repeat(Math.floor(hero.because_rating))}${hero.because_rating % 1 ? '½' : ''} watch and TMDB sees a strong overlap with your taste — ${Math.round(hero.match * 100)}% match.</p>
         </div>
       </div>
     </button>
   `;
 
-  const rail1 = rail({
-    title: 'Because of Céline Sciamma',
-    films: data.recommendations.slice(0, 4),
-  });
-  const rail2 = rail({
-    title: 'Slow-cinema kick',
-    films: data.recommendations.slice(3, 8),
-  });
-
   const grid = `
     <section class="m-grid-section">
       <div class="eyebrow eyebrow--mb-md">The full list</div>
       <div class="m-grid">
-        ${data.recommendations.map(gridCard).join('')}
+        ${rest.map(recGridCard).join('')}
       </div>
     </section>
   `;
 
   const content = `
-    ${header({ eyebrow: '04 May · 12 new picks', title: 'CineMatch', right: refreshButton })}
-    ${fixtureNote('Recommendations are placeholder data until Phase 4 ships the engine.')}
+    ${header({ eyebrow, title: 'CineMatch', right: refreshButton })}
     ${tonightsPick}
-    ${sectionHead({ title: 'More for you', meta: '12 FILMS' })}
-    ${rail1}
-    ${rail2}
+    ${sectionHead({ title: 'More for you', meta: `${rest.length} FILMS` })}
     ${grid}
   `;
-
   return mobileShell({ content, footerActive: 'feed' });
 }
 
-function rail({ title, films }) {
-  return `
-    <section class="m-rail">
-      <div class="m-rail__head">
-        <h3 class="m-rail__title">${esc(title)}</h3>
-        <span class="m-rail__more" aria-hidden="true">→</span>
-      </div>
-      <div class="m-rail__track">
-        ${films.map((film) => `
-          <button class="m-rail__item"
-                  data-action="open-film"
-                  data-film-id="${film.id}"
-                  aria-label="${esc(film.title)}, ${esc(film.year)}, ${Math.round(film.score * 100)}% match">
-            <div class="m-rail__poster-wrap">
-              ${poster({ title: film.title, year: film.year })}
-              <div class="m-rail__match">${matchBadge(film.score)}</div>
-            </div>
-            <div class="m-rail__title-text">${esc(film.title)}</div>
-            <div class="m-rail__director">${esc(film.director)}</div>
-          </button>
-        `).join('')}
-      </div>
-    </section>
-  `;
-}
-
-function gridCard(film) {
+function recGridCard(rec) {
+  const meta = [
+    rec.year ? String(rec.year) : null,
+    rec.genres?.length ? rec.genres[0] : null,
+  ].filter(Boolean).join(' · ');
   return `
     <button class="m-card"
-            data-action="open-film"
-            data-film-id="${film.id}"
-            aria-label="${esc(film.title)}, ${esc(film.year)}, directed by ${esc(film.director)}, ${Math.round(film.score * 100)}% match">
+            data-action="open-rec"
+            data-tmdb-id="${rec.tmdb_id}"
+            aria-label="${esc(rec.title)}${rec.year ? ', ' + rec.year : ''}, ${Math.round(rec.match * 100)}% match, because you loved ${esc(rec.because)}">
       <div class="m-card__poster-wrap">
-        ${poster({ title: film.title, year: film.year })}
-        <div class="m-card__match">${matchBadge(film.score)}</div>
+        ${poster({ title: rec.title, year: rec.year, posterPath: rec.poster_path })}
+        <div class="m-card__match">${matchBadge(rec.match)}</div>
       </div>
-      <div class="m-card__title">${esc(film.title)}</div>
-      <div class="m-card__meta">${esc(film.director)} · ${esc(film.year)}</div>
+      <div class="m-card__title">${esc(rec.title)}</div>
+      <div class="m-card__meta">${esc(meta)}</div>
+      <div class="m-card__because">because <em>${esc(rec.because)}</em></div>
     </button>
   `;
 }
@@ -117,16 +147,35 @@ function gridCard(film) {
 // =====================================================================
 export function detailScreen(film) {
   if (!film) return '';
-  // Defaults match the prototype so unrelated films render gracefully.
+  // Defaults so films from any source render gracefully.
   const f = {
-    tagline: 'We share the same sky.',
-    runtime: 102,
-    genres: ['Drama'],
-    why: 'Slow, observational dramas with father-daughter intimacy — three of your five-star films share this DNA.',
-    matches: ['Past Lives', 'The Souvenir', 'Petite Maman'],
-    score: 0.94,
+    tagline: '',
+    runtime: null,
+    director: null,
+    genres: [],
+    why: '',
+    matches: [],
+    score: 0.85,
+    poster_path: null,
+    overview: '',
+    because: null,
+    because_rating: null,
     ...film,
   };
+
+  // For real recommendations, the "connection" copy comes from the anchor
+  // film + TMDB overview; otherwise we fall back to the canned poetic line.
+  if (f.because) {
+    if (!f.matches?.length) f.matches = [f.because];
+    if (!f.why) {
+      const ratingLabel = f.because_rating
+        ? `${'★'.repeat(Math.floor(f.because_rating))}${f.because_rating % 1 ? '½' : ''}`
+        : '';
+      f.why = f.overview
+        ? f.overview
+        : `Recommended because ${f.because}${ratingLabel ? ` (${ratingLabel})` : ''} sits in your wheelhouse and TMDB sees a strong overlap with your taste.`;
+    }
+  }
 
   const heroChrome = `
     <div class="m-detail-hero__chrome">
@@ -167,8 +216,31 @@ export function detailScreen(film) {
     </div>
   `).join('');
 
+  // Build meta row only from fields we actually have.
+  const metaParts = [
+    f.year ? esc(f.year) : null,
+    f.director ? esc(f.director.toUpperCase()) : null,
+    f.runtime ? `${esc(f.runtime)} MIN` : null,
+    f.genres?.length ? esc(f.genres.join(' · ').toUpperCase()) : null,
+  ].filter(Boolean);
+  const metaRow = metaParts.map((part, i) => `
+    ${i > 0 ? `<span class="m-detail__meta-sep" aria-hidden="true">/</span>` : ''}
+    <span>${part}</span>
+  `).join('');
+
+  // Letterboxd watchlist link — direct URI if known, search fallback otherwise
+  // (per CLAUDE.md "Letterboxd Watchlist Linking" two-tier strategy).
+  const lbxLink = f.letterboxd_uri
+    || `https://letterboxd.com/search/films/${encodeURIComponent(`${f.title} ${f.year || ''}`)}/`;
+
+  const heroBody = f.poster_path
+    ? `<img class="m-detail-hero__img" src="https://image.tmdb.org/t/p/w780${f.poster_path}" alt="${esc(f.title)}" />`
+    : '';
+  const heroClass = f.poster_path ? 'm-detail-hero m-detail-hero--real' : 'm-detail-hero';
+
   const content = `
-    <div class="m-detail-hero">
+    <div class="${heroClass}">
+      ${heroBody}
       <div class="m-detail-hero__scrim"></div>
       ${heroChrome}
       <div class="m-detail-hero__caption">
@@ -178,29 +250,22 @@ export function detailScreen(film) {
     </div>
 
     <div class="m-detail-body">
-      <div class="m-detail__meta">
-        <span>${esc(f.year)}</span>
-        <span class="m-detail__meta-sep" aria-hidden="true">/</span>
-        <span>${esc(f.director.toUpperCase())}</span>
-        <span class="m-detail__meta-sep" aria-hidden="true">/</span>
-        <span>${esc(f.runtime)} MIN</span>
-        <span class="m-detail__meta-sep" aria-hidden="true">/</span>
-        <span>${esc(f.genres.join(' · ').toUpperCase())}</span>
-      </div>
+      ${metaRow ? `<div class="m-detail__meta">${metaRow}</div>` : ''}
 
-      <p class="m-detail__tagline">&ldquo;${esc(f.tagline)}&rdquo;</p>
+      ${f.tagline ? `<p class="m-detail__tagline">&ldquo;${esc(f.tagline)}&rdquo;</p>` : ''}
 
-      <button class="m-btn m-btn--primary m-mt-md">+ Add to Letterboxd watchlist</button>
+      <a class="m-btn m-btn--primary m-mt-md" href="${esc(lbxLink)}" target="_blank" rel="noopener">+ Add to Letterboxd watchlist</a>
       <div class="m-detail__cta-row">
         <button class="m-btn m-btn--ghost">Trailer ↗</button>
         <button class="m-btn m-btn--ghost-soft">Not for me</button>
       </div>
 
+      ${f.why ? `
       <div class="m-detail__section">
         <div class="eyebrow eyebrow--mb-lg">The connection</div>
         <p class="m-detail__why">${esc(f.why)}</p>
-        <div class="m-detail__matches">${matchRows}</div>
-      </div>
+        ${matchRows ? `<div class="m-detail__matches">${matchRows}</div>` : ''}
+      </div>` : ''}
 
       <div class="m-detail__section">
         <div class="eyebrow eyebrow--mb-lg">Score breakdown</div>

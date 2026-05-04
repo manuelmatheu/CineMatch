@@ -19,6 +19,7 @@
 import { storage } from './storage.js';
 import { searchMovie, getMovieWithCredits } from './tmdb.js';
 import { buildTasteProfile } from './taste.js';
+import { buildRecommendations } from './recommendations.js';
 
 const MIN_DELAY_MS = 300;
 const SAVE_EVERY = 10;
@@ -42,6 +43,12 @@ export async function resolveHistory() {
   } finally {
     running = false;
   }
+
+  // Once enrichment is done, kick off the recommendations build in the
+  // background. Errors are swallowed inside; nothing here depends on it.
+  buildRecommendations().catch((err) =>
+    console.warn('[CineMatch] recommendations build failed', err)
+  );
 }
 
 // === Phase A: posters ==================================================

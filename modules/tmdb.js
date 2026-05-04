@@ -138,3 +138,33 @@ export async function getMovieWithCredits(id, token) {
     release_date: data.release_date || null,
   };
 }
+
+/**
+ * Fetches TMDB's recommendation candidates for a given film.
+ * Used by the recommendations engine (Phase 4) — for each high-rated
+ * recent film in the user's history, we pull this list and score the
+ * candidates against the taste profile.
+ *
+ * Returns the raw `results` array (page 1 only, ~20 items per call).
+ * Each item carries: id, title, release_date, poster_path, vote_average,
+ * popularity, vote_count, genre_ids, original_language, overview.
+ *
+ * NOTE: per CLAUDE.md, /recommendations is preferred over /similar — it
+ * uses TMDB's collaborative filtering, /similar is keyword/genre matching
+ * only and produces noticeably weaker picks.
+ */
+export async function getRecommendations(id, token) {
+  const url = `${TMDB_BASE}/movie/${id}/recommendations?page=1`;
+  const r = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (r.status === 429) {
+    const retry = Number(r.headers.get('Retry-After')) || 1;
+    await new Promise((res) => setTimeout(res, retry * 1000));
+    return getRecommendations(id, token);
+  }
+  if (r.status === 404) return [];
+  if (!r.ok) throw new Error(`TMDB recommendations for ${id} failed: HTTP ${r.status}`);
+  const data = await r.json();
+  return Array.isArray(data.results) ? data.results : [];
+}

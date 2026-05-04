@@ -14,6 +14,7 @@ import { storage } from './modules/storage.js';
 import { validateToken } from './modules/tmdb.js';
 import { fetchRssEntries, parseCsv, mergeHistory } from './modules/letterboxd.js';
 import { resolveHistory, RESOLVER_PROGRESS_EVENT } from './modules/resolver.js';
+import { buildRecommendations, RECOMMENDATIONS_PROGRESS_EVENT } from './modules/recommendations.js';
 
 const root = document.getElementById('root');
 
@@ -79,6 +80,24 @@ function render() {
 }
 
 function findFilmById(id) {
+  // Live recommendations first (Phase 4) — keyed by tmdb_id.
+  const recsBlob = storage.getRecommendations();
+  const fromRecs = recsBlob?.items?.find((r) => r.tmdb_id === id);
+  if (fromRecs) {
+    return {
+      id: fromRecs.tmdb_id,
+      title: fromRecs.title,
+      year: fromRecs.year,
+      poster_path: fromRecs.poster_path,
+      score: fromRecs.match,
+      genres: fromRecs.genres,
+      because: fromRecs.because,
+      because_rating: fromRecs.because_rating,
+      overview: fromRecs.overview,
+    };
+  }
+
+  // Fixture fallback (used by Coming Soon while Phase 5 isn't real yet).
   if (CINEMATCH_DATA.hero.id === id) return CINEMATCH_DATA.hero;
   return (
     CINEMATCH_DATA.recommendations.find((f) => f.id === id) ||
@@ -195,6 +214,14 @@ root.addEventListener('click', (e) => {
     case 'open-film':
       navigate(`/detail/${target.dataset.filmId}`);
       break;
+    case 'open-rec':
+      navigate(`/detail/${target.dataset.tmdbId}`);
+      break;
+    case 'refresh-recs':
+      buildRecommendations().catch((err) =>
+        console.warn('[CineMatch] manual rec rebuild failed', err)
+      );
+      break;
     case 'close-film':
       if (window.history.length > 1) window.history.back();
       else navigate('/feed');
@@ -250,12 +277,16 @@ root.addEventListener('change', (e) => {
 window.addEventListener('hashchange', render);
 
 // When the resolver completes a batch (every 10 entries), re-render the
-// current screen if it shows live data (diary, taste, more) so newly
-// resolved posters / enriched genres / refreshed counts appear without
-// the user having to refresh.
-const LIVE_SCREENS = new Set(['diary', 'taste', 'more']);
+// current screen if it shows live data so posters / enrichment / counts
+// appear without a manual refresh.
+const LIVE_SCREENS = new Set(['feed', 'diary', 'taste', 'more']);
 window.addEventListener(RESOLVER_PROGRESS_EVENT, () => {
   if (LIVE_SCREENS.has(parseHash().name)) render();
+});
+// Same for the recommendations engine — re-render the feed as candidates
+// arrive in batches so the user sees the rec set evolve in place.
+window.addEventListener(RECOMMENDATIONS_PROGRESS_EVENT, () => {
+  if (parseHash().name === 'feed') render();
 });
 
 // Boot.
