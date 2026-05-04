@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Local env
+.env
+.env.local
+
+# Vercel
+.vercel/
+
+# Node
+node_modules/
+
+# User-provided CSV exports — never commit
+data/*
+!data/.gitkeep
+
+# Editor noise
+.vscode/
+.idea/
+*.swp
