@@ -3,7 +3,7 @@
 // All event hooks are data-attribute based; app.js handles them via delegation.
 
 import { CINEMATCH_DATA, TODAY } from './data.js';
-import { esc, poster, matchBadge, header, mobileShell, sectionHead, stars } from './ui.js';
+import { esc, poster, matchBadge, header, mobileShell, sectionHead, stars, fixtureNote } from './ui.js';
 import { storage } from './storage.js';
 
 // =====================================================================
@@ -59,6 +59,7 @@ export function feedScreen() {
 
   const content = `
     ${header({ eyebrow: '04 May · 12 new picks', title: 'CineMatch', right: refreshButton })}
+    ${fixtureNote('Recommendations are placeholder data until Phase 4 ships the engine.')}
     ${tonightsPick}
     ${sectionHead({ title: 'More for you', meta: '12 FILMS' })}
     ${rail1}
@@ -243,6 +244,7 @@ export function upcomingScreen() {
 
   const content = `
     ${header({ eyebrow: 'Filtered to your taste · region AR', title: 'Coming Soon' })}
+    ${fixtureNote('Upcoming releases land in Phase 5 once the taste profile drives the filter.')}
     <div class="m-upcoming-list">${rows}</div>
   `;
   return mobileShell({ content, footerActive: 'upcoming' });
@@ -315,6 +317,7 @@ export function tasteScreen() {
 
   const content = `
     ${header({ eyebrow: '847 films · 2019 → present', title: 'Your taste' })}
+    ${fixtureNote('Taste profile is computed in Phase 3 from your real watch history.')}
     <div class="m-taste-body">
       <div class="m-taste__statgrid">${stats}</div>
 
@@ -346,33 +349,69 @@ export function tasteScreen() {
 }
 
 // =====================================================================
-// DIARY — recent watches list (RSS live)
+// DIARY — recent watches from real localStorage history (Phase 1+ data)
 // =====================================================================
 export function diaryScreen() {
-  const data = CINEMATCH_DATA;
+  const history = storage.getHistory();
+  const lastSync = storage.getLastSync();
   const live = `<span class="m-header__live">● RSS</span>`;
 
-  const rows = data.recentDiary.map((entry) => {
-    const dateStr = new Date(entry.date)
-      .toLocaleDateString('en', { month: 'short', day: 'numeric' })
-      .toUpperCase();
+  // Empty state for users who haven't completed setup or whose RSS fetch failed.
+  if (history.length === 0) {
+    const content = `
+      ${header({ eyebrow: 'Nothing synced yet', title: 'Recent diary', right: live })}
+      <div class="m-diary-list">
+        <div class="m-empty">
+          <div class="m-empty__title">No watches yet</div>
+          <p class="m-empty__body">Complete setup to fetch your Letterboxd diary, or upload your CSV export for the full back catalogue.</p>
+          <button class="m-btn m-btn--ghost" data-action="open-setup">Open setup</button>
+        </div>
+      </div>
+    `;
+    return mobileShell({ content, footerActive: 'diary' });
+  }
+
+  const eyebrow = lastSync
+    ? `Live · synced ${diaryRelativeTime(Date.now() - lastSync)} ago · ${history.length} films`
+    : `${history.length} films`;
+
+  // Diary view shows the most-recent 50 watches; full history is searchable later.
+  const rows = history.slice(0, 50).map((entry) => {
+    const date = entry.watched_date ? new Date(entry.watched_date) : null;
+    const dateStr = date && !isNaN(date)
+      ? date.toLocaleDateString('en', { month: 'short', day: 'numeric' }).toUpperCase()
+      : '—';
+    const ratingHtml = entry.rating != null
+      ? stars({ value: entry.rating, size: 11 })
+      : `<span class="m-diary__unrated">unrated</span>`;
     return `
       <div class="m-diary__row">
         <div class="m-diary__poster">${poster({ title: entry.title, year: entry.year })}</div>
         <div class="m-min-w-0">
           <div class="m-diary__title">${esc(entry.title)}</div>
-          <div class="m-diary__meta">${esc(entry.year)} · ${esc(dateStr)}</div>
+          <div class="m-diary__meta">${entry.year ? esc(entry.year) + ' · ' : ''}${esc(dateStr)}${entry.rewatch ? ' · ↻' : ''}</div>
         </div>
-        ${stars({ value: entry.rating, size: 11 })}
+        ${ratingHtml}
       </div>
     `;
   }).join('');
 
   const content = `
-    ${header({ eyebrow: 'Live · synced 12m ago', title: 'Recent diary', right: live })}
+    ${header({ eyebrow, title: 'Recent diary', right: live })}
     <div class="m-diary-list">${rows}</div>
   `;
   return mobileShell({ content, footerActive: 'diary' });
+}
+
+// Local copy of the relative-time helper so the diary can show its sync age.
+function diaryRelativeTime(ms) {
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h`;
+  return `${Math.round(hr / 24)}d`;
 }
 
 // =====================================================================

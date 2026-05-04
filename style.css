@@ -779,6 +779,59 @@
 
 /* === Diary list ====================================================== */
 .m-diary-list { padding: 8px 20px 32px; }
+.m-diary__unrated {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+
+/* === Empty state ====================================================== */
+.m-empty {
+  padding: 48px 24px 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.m-empty__title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 28px;
+  color: var(--bone-100);
+  letter-spacing: -0.015em;
+}
+.m-empty__body {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--bone-400);
+  max-width: 36ch;
+  margin: 0;
+}
+.m-empty .m-btn { margin-top: 8px; }
+
+/* === Fixture-data banner (shown on screens not yet wired to real data) - */
+.m-fixture-note {
+  margin: 0 20px 16px;
+  padding: 10px 12px;
+  border: var(--hairline-soft);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.015);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--bone-400);
+}
+.m-fixture-note strong {
+  color: var(--amber-400);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
 .m-diary__row {
   display: grid;
   grid-template-columns: 60px 1fr auto;

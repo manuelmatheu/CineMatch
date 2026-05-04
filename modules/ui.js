@@ -119,3 +119,15 @@ export function sectionHead({ title, meta = '' }) {
     </section>
   `;
 }
+
+// === Fixture-data banner ==============================================
+// Used on screens that still render placeholder data (Recommendations,
+// Tonight's pick, Coming Soon, Taste profile) until TMDB resolution
+// (Phase 2) and the recommendation engine (Phase 4) are built.
+export function fixtureNote(message) {
+  return `
+    <div class="m-fixture-note" role="note">
+      <strong>Preview ·</strong> ${esc(message)}
+    </div>
+  `;
+}
