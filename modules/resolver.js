@@ -28,6 +28,31 @@ const SAVE_EVERY = 10;
 const PROGRESS_EVENT = 'cinematch:resolution-progress';
 
 let running = false;
+let storageWarned = false;
+
+// Wraps storage.setHistory so a localStorage failure (quota, serialization,
+// privacy mode) doesn't crash the resolver loop. We notify once per session
+// and keep working in-memory; the next save attempt may still succeed.
+function safeSaveHistory(history) {
+  try {
+    storage.setHistory(history);
+    return true;
+  } catch (err) {
+    console.warn('[CineMatch] history save failed', err);
+    if (!storageWarned) {
+      storageWarned = true;
+      const isQuota = err && (err.name === 'QuotaExceededError' || /quota/i.test(err.message || ''));
+      notify(
+        isQuota
+          ? 'Out of browser storage — large libraries may exceed the localStorage limit.'
+          : `Couldn't save progress: ${err.message || 'unknown error'}`,
+        'error',
+        { dismissMs: 6000 }
+      );
+    }
+    return false;
+  }
+}
 
 export function isResolving() { return running; }
 export const RESOLVER_PROGRESS_EVENT = PROGRESS_EVENT;
@@ -85,7 +110,7 @@ async function runPosterPass() {
       console.warn('[CineMatch] poster lookup failed for', entry.title, err);
       if (isAuthError(err)) {
         notify('TMDB token rejected — re-enter it in More → Re-run setup.', 'error', { dismissMs: 6000 });
-        storage.setHistory(history);
+        safeSaveHistory(history);
         return;
       }
       // Mark as unresolvable so we don't get stuck retrying it forever.
@@ -94,11 +119,11 @@ async function runPosterPass() {
 
     done++;
     emit({ phase: 'posters', done, total: todo.length, finished: false });
-    if (done % SAVE_EVERY === 0) storage.setHistory(history);
+    if (done % SAVE_EVERY === 0) safeSaveHistory(history);
     await sleep(MIN_DELAY_MS);
   }
 
-  storage.setHistory(history);
+  safeSaveHistory(history);
   emit({ phase: 'posters', done, total: todo.length, finished: true });
 }
 
@@ -138,7 +163,7 @@ async function runEnrichmentPass() {
       console.warn('[CineMatch] enrichment failed for', entry.title, err);
       if (isAuthError(err)) {
         notify('TMDB token rejected — re-enter it in More → Re-run setup.', 'error', { dismissMs: 6000 });
-        storage.setHistory(history);
+        safeSaveHistory(history);
         rebuildTasteProfile();
         return;
       }
@@ -149,13 +174,13 @@ async function runEnrichmentPass() {
     done++;
     emit({ phase: 'enrichment', done, total: todo.length, finished: false });
     if (done % SAVE_EVERY === 0) {
-      storage.setHistory(history);
+      safeSaveHistory(history);
       rebuildTasteProfile();
     }
     await sleep(MIN_DELAY_MS);
   }
 
-  storage.setHistory(history);
+  safeSaveHistory(history);
   rebuildTasteProfile();
   emit({ phase: 'enrichment', done, total: todo.length, finished: true });
 }

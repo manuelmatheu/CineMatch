@@ -396,22 +396,29 @@ if (DESKTOP_QUERY.addEventListener) {
   DESKTOP_QUERY.addEventListener('change', render);
 }
 
-// When the resolver completes a batch (every 10 entries), re-render the
-// current screen if it shows live data so posters / enrichment / counts
-// appear without a manual refresh.
+// When background work emits progress, re-render the current screen if
+// it shows live data — coalesced via rAF so a flood of resolver events
+// (one per TMDB hit) collapses into one paint per frame instead of
+// rebuilding the whole DOM 3+ times per second.
 const LIVE_SCREENS = new Set(['feed', 'diary', 'taste', 'more']);
+let renderQueued = false;
+function renderSoon() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    render();
+  });
+}
+
 window.addEventListener(RESOLVER_PROGRESS_EVENT, () => {
-  if (LIVE_SCREENS.has(parseHash().name)) render();
+  if (LIVE_SCREENS.has(parseHash().name)) renderSoon();
 });
-// Same for the recommendations engine — re-render the feed as candidates
-// arrive in batches so the user sees the rec set evolve in place.
 window.addEventListener(RECOMMENDATIONS_PROGRESS_EVENT, () => {
-  if (parseHash().name === 'feed') render();
+  if (parseHash().name === 'feed') renderSoon();
 });
-// Upcoming list builds in one go (3 pages); re-render when each page lands
-// so the count grows instead of jumping from 0 to "all".
 window.addEventListener(UPCOMING_PROGRESS_EVENT, () => {
-  if (parseHash().name === 'upcoming') render();
+  if (parseHash().name === 'upcoming') renderSoon();
 });
 
 // Service worker — caches the app shell + TMDB poster images so the app
