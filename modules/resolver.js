@@ -88,13 +88,13 @@ async function runPosterPass() {
         storage.setHistory(history);
         return;
       }
+      // Mark as unresolvable so we don't get stuck retrying it forever.
+      entry.tmdb_id = -1;
     }
 
     done++;
-    if (done % SAVE_EVERY === 0) {
-      storage.setHistory(history);
-      emit({ phase: 'posters', done, total: todo.length, finished: false });
-    }
+    emit({ phase: 'posters', done, total: todo.length, finished: false });
+    if (done % SAVE_EVERY === 0) storage.setHistory(history);
     await sleep(MIN_DELAY_MS);
   }
 
@@ -142,13 +142,15 @@ async function runEnrichmentPass() {
         rebuildTasteProfile();
         return;
       }
+      // Mark with an empty genres array so we don't keep retrying.
+      entry.genres = [];
     }
 
     done++;
+    emit({ phase: 'enrichment', done, total: todo.length, finished: false });
     if (done % SAVE_EVERY === 0) {
       storage.setHistory(history);
       rebuildTasteProfile();
-      emit({ phase: 'enrichment', done, total: todo.length, finished: false });
     }
     await sleep(MIN_DELAY_MS);
   }

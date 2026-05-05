@@ -6,6 +6,33 @@
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const IMG_BASE  = 'https://image.tmdb.org/t/p/';
 
+const REQUEST_TIMEOUT_MS = 10000;
+const MAX_RETRIES = 3;
+
+async function tmdbFetch(url, token, attempt = 0) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (r.status === 429 && attempt < MAX_RETRIES) {
+      const retry = Number(r.headers.get('Retry-After')) || 1;
+      await new Promise((res) => setTimeout(res, retry * 1000));
+      return tmdbFetch(url, token, attempt + 1);
+    }
+    return r;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`TMDB request timed out after ${REQUEST_TIMEOUT_MS}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * TMDB movie genre IDs → names. IDs are stable; hardcoding saves a
  * /genre/movie/list roundtrip on every cold boot. Used by both the
@@ -76,15 +103,7 @@ export async function searchMovie(title, year, token) {
   const params = new URLSearchParams({ query: title, include_adult: 'false' });
   if (year) params.set('year', String(year));
 
-  const r = await fetch(`${TMDB_BASE}/search/movie?${params}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
-
-  if (r.status === 429) {
-    const retryAfter = Number(r.headers.get('Retry-After')) || 1;
-    await new Promise((res) => setTimeout(res, retryAfter * 1000));
-    return searchMovie(title, year, token);
-  }
+  const r = await tmdbFetch(`${TMDB_BASE}/search/movie?${params}`, token);
   if (!r.ok) throw new Error(`TMDB search failed: HTTP ${r.status}`);
 
   const data = await r.json();
@@ -127,15 +146,7 @@ export async function searchMovie(title, year, token) {
  */
 export async function getMovieWithCredits(id, token) {
   const url = `${TMDB_BASE}/movie/${id}?append_to_response=credits`;
-  const r = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
-
-  if (r.status === 429) {
-    const retry = Number(r.headers.get('Retry-After')) || 1;
-    await new Promise((res) => setTimeout(res, retry * 1000));
-    return getMovieWithCredits(id, token);
-  }
+  const r = await tmdbFetch(url, token);
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`TMDB movie ${id} failed: HTTP ${r.status}`);
 
@@ -170,14 +181,7 @@ export async function getMovieWithCredits(id, token) {
  */
 export async function getRecommendations(id, token) {
   const url = `${TMDB_BASE}/movie/${id}/recommendations?page=1`;
-  const r = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
-  if (r.status === 429) {
-    const retry = Number(r.headers.get('Retry-After')) || 1;
-    await new Promise((res) => setTimeout(res, retry * 1000));
-    return getRecommendations(id, token);
-  }
+  const r = await tmdbFetch(url, token);
   if (r.status === 404) return [];
   if (!r.ok) throw new Error(`TMDB recommendations for ${id} failed: HTTP ${r.status}`);
   const data = await r.json();
@@ -196,14 +200,7 @@ export async function getRecommendations(id, token) {
 export async function getUpcoming(region, page, token) {
   const params = new URLSearchParams({ region, page: String(page) });
   const url = `${TMDB_BASE}/movie/upcoming?${params}`;
-  const r = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
-  if (r.status === 429) {
-    const retry = Number(r.headers.get('Retry-After')) || 1;
-    await new Promise((res) => setTimeout(res, retry * 1000));
-    return getUpcoming(region, page, token);
-  }
+  const r = await tmdbFetch(url, token);
   if (!r.ok) throw new Error(`TMDB upcoming page ${page} failed: HTTP ${r.status}`);
   const data = await r.json();
   return Array.isArray(data.results) ? data.results : [];
