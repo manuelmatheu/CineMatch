@@ -88,18 +88,22 @@ export function header({ eyebrow, title, right = '' }) {
   `;
 }
 
-// === Bottom tab bar ===================================================
-const TABS = [
+// === Primary navigation ===============================================
+// One source of truth shared by the bottom tabbar (mobile) and the
+// sidebar (desktop). Both render the same destinations; CSS swaps them
+// at the 1024px breakpoint.
+const NAV = [
   { id: 'feed',     label: 'Picks', icon: '▶' },
   { id: 'upcoming', label: 'Soon',  icon: '◷' },
   { id: 'taste',    label: 'Taste', icon: '◉' },
   { id: 'diary',    label: 'Diary', icon: '❍' },
   { id: 'more',     label: 'More',  icon: '⋯' },
 ];
+
 export function tabBar(active) {
   return `
     <nav class="m-tabbar" role="navigation" aria-label="Primary">
-      ${TABS.map((t) => `
+      ${NAV.map((t) => `
         <button class="m-tabbar__btn"
                 data-action="tab"
                 data-tab="${t.id}"
@@ -112,14 +116,50 @@ export function tabBar(active) {
   `;
 }
 
-// === Mobile shell wrapper =============================================
-// Composes a scroll region + (optional) bottom tab bar.
-// `content` is an HTML string for everything inside the scroll region.
+export function sidebar(active) {
+  return `
+    <aside class="m-sidebar" aria-label="Primary">
+      <div class="m-sidebar__brand">
+        <span class="m-sidebar__brand-mark" aria-hidden="true">▸</span>
+        <span class="m-sidebar__brand-name">CineMatch</span>
+      </div>
+      <nav class="m-sidebar__nav">
+        ${NAV.map((n) => `
+          <button class="m-sidebar__item ${active === n.id ? 'is-active' : ''}"
+                  data-action="tab"
+                  data-tab="${n.id}"
+                  aria-current="${active === n.id ? 'page' : 'false'}">
+            <span class="m-sidebar__icon" aria-hidden="true">${n.icon}</span>
+            <span class="m-sidebar__label">${n.label}</span>
+          </button>
+        `).join('')}
+      </nav>
+      <div class="m-sidebar__footer">
+        <button class="m-sidebar__item m-sidebar__item--soft"
+                data-action="open-setup">
+          <span class="m-sidebar__icon" aria-hidden="true">⚙</span>
+          <span class="m-sidebar__label">Re-run setup</span>
+        </button>
+      </div>
+    </aside>
+  `;
+}
+
+// === App shell wrapper ================================================
+// Mobile: the sidebar is hidden, the shell is a centred phone column,
+// and the tabbar pins to the bottom. Desktop (≥1024px): the sidebar
+// appears, the tabbar hides, and the shell expands to fill the column.
+// Detail/setup screens pass hideFooter=true to suppress the tabbar
+// (immersive mobile view); the sidebar still shows on desktop because
+// nav is the only way out.
 export function mobileShell({ content, footerActive = 'feed', hideFooter = false }) {
   return `
-    <div class="m-shell ${hideFooter ? 'no-footer' : ''}">
-      <div class="m-scroll">${content}</div>
-      ${hideFooter ? '' : tabBar(footerActive)}
+    <div class="m-app">
+      ${sidebar(footerActive)}
+      <div class="m-shell ${hideFooter ? 'no-footer' : ''}">
+        <div class="m-scroll">${content}</div>
+        ${hideFooter ? '' : tabBar(footerActive)}
+      </div>
     </div>
   `;
 }

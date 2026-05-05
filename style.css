@@ -5,13 +5,23 @@
    Mobile-first (390×844 reference); content centres on viewports >480px.
    ====================================================================== */
 
-/* === Layout viewport ================================================= */
+/* === Layout viewport =================================================
+   Mobile (default): single phone-shaped column, sidebar hidden, tabbar
+   pinned. Tablet (≥481): centred phone column with a soft frame to
+   distinguish it from the page background. Desktop (≥1024): the
+   sidebar appears, the tabbar hides, the shell loses its frame and
+   becomes the editorial column flush against the sidebar.
+   ==================================================================== */
 #root {
   min-height: 100dvh;
   display: flex;
   justify-content: center;
   background: var(--ink-900);
 }
+/* The .m-app wrapper is "transparent" on mobile/tablet so the existing
+   centred phone-shell layout still works. Desktop turns it into a real
+   flex container that hosts both the sidebar and the shell. */
+.m-app { display: contents; }
 .m-shell {
   width: 100%;
   max-width: 480px;
@@ -31,6 +41,131 @@
   .m-shell {
     box-shadow: 0 0 0 1px var(--ink-700), 0 30px 80px -20px rgba(0,0,0,0.6);
   }
+}
+
+/* === Sidebar (desktop only) ==========================================
+   Editorial nav rail. Same five destinations as the bottom tabbar, but
+   labelled in mono caps with the active item picking up the ink-800
+   surface + amber icon — accent used like punctuation, not decoration.
+   ==================================================================== */
+.m-sidebar { display: none; }
+
+.m-sidebar__brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--bone-100);
+  letter-spacing: -0.02em;
+  margin-bottom: var(--s-9);
+}
+.m-sidebar__brand-mark {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 18px;
+  color: var(--amber-400);
+}
+.m-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.m-sidebar__footer {
+  padding-top: var(--s-5);
+  margin-top: var(--s-5);
+  border-top: var(--hairline-soft);
+}
+.m-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-2);
+  color: var(--bone-300);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+.m-sidebar__icon {
+  display: inline-flex;
+  justify-content: center;
+  width: 18px;
+  font-size: 14px;
+  color: var(--bone-500);
+  transition: color var(--dur) var(--ease-out);
+}
+.m-sidebar__item.is-active {
+  color: var(--bone-100);
+  background: var(--ink-800);
+}
+.m-sidebar__item.is-active .m-sidebar__icon { color: var(--amber-400); }
+.m-sidebar__item--soft { color: var(--bone-400); }
+
+/* === Desktop breakpoint (≥1024px) ====================================
+   Sidebar + editorial column. Phone framing is dropped, status-bar
+   offsets disappear, headers get a hairline divider, and the scroll
+   region gets generous lateral padding (var(--s-9) = 56px) per the
+   reference layout.
+   ==================================================================== */
+@media (min-width: 1024px) {
+  body { background: var(--ink-900); }
+  #root { justify-content: stretch; }
+
+  .m-app {
+    display: flex;
+    width: 100%;
+    max-width: 1440px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    align-items: stretch;
+  }
+
+  .m-sidebar {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 240px;
+    width: 240px;
+    padding: var(--s-9) var(--s-6) var(--s-6);
+    border-right: var(--hairline-soft);
+    background: var(--ink-900);
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+  }
+
+  .m-shell {
+    max-width: none;
+    flex: 1;
+    box-shadow: none;
+    /* keep height: 100dvh from base — preserves inner-scroll architecture */
+  }
+
+  .m-scroll {
+    padding: 0 var(--s-9) var(--s-7);
+  }
+
+  .m-tabbar { display: none; }
+
+  /* Header de-mobilises: drop the iOS status-bar offset, drop the
+     20px lateral padding (the scroll region carries it now), add a
+     hairline divider so it reads as an editorial masthead. */
+  .m-header {
+    padding: var(--s-9) 0 var(--s-6);
+    border-bottom: var(--hairline-soft);
+    margin-bottom: var(--s-7);
+  }
+  .m-header__title { font-size: 48px; }
 }
 .m-scroll {
   flex: 1;
@@ -307,6 +442,64 @@
   color: var(--bone-200);
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* === Feed: desktop layout (≥1024px) ==================================
+   Same DOM as mobile — only the layout changes.
+   Hero becomes a 2-col editorial spread (poster left, headline right);
+   the rec grid becomes auto-fit so it fills the column with as many
+   cards as fit at a comfortable ~200px each. Lateral padding zeros
+   out because .m-scroll already carries 56px on desktop.
+   ==================================================================== */
+@media (min-width: 1024px) {
+  .m-tonight {
+    padding: var(--s-2) 0 var(--s-9);
+    margin-bottom: var(--s-8);
+    border-bottom: var(--hairline-soft);
+  }
+  .m-tonight__eyebrow {
+    font-size: var(--t-mono);
+    margin-bottom: var(--s-4);
+  }
+  .m-tonight__hero {
+    display: grid;
+    grid-template-columns: minmax(260px, 360px) 1fr;
+    gap: var(--s-9);
+    align-items: start;
+  }
+  .m-tonight__title {
+    font-size: clamp(56px, 5vw, 80px);
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+  }
+  .m-tonight__meta {
+    font-size: var(--t-mono);
+    margin-top: var(--s-4);
+    gap: var(--s-3);
+  }
+  .m-tonight__why {
+    margin-top: var(--s-6);
+    padding: var(--s-5) var(--s-6);
+    max-width: 620px;
+  }
+  .m-tonight__why p {
+    font-size: var(--t-body);
+    line-height: 1.55;
+  }
+
+  .m-section-head { padding: 0; margin-bottom: var(--s-5); }
+  .m-section-head__title { font-size: var(--t-h2); }
+
+  .m-grid-section { padding: 0; }
+  .m-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    column-gap: var(--s-6);
+    row-gap: var(--s-8);
+  }
+  .m-card { gap: var(--s-3); }
+  .m-card__title { font-size: var(--t-h4); }
+  .m-card__meta { font-size: var(--t-tiny); }
+  .m-card__because { font-size: var(--t-small); }
 }
 
 /* === Section header ================================================== */
