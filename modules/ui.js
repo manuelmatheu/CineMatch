@@ -146,23 +146,30 @@ export function sidebar(active) {
 }
 
 // === App shell wrapper ================================================
-// Mobile: the sidebar is hidden, the shell is a centred phone column,
-// and the tabbar pins to the bottom. Desktop (≥1024px): the sidebar
-// appears, the tabbar hides, and the shell expands to fill the column.
-// Detail/setup screens pass hideFooter=true to suppress the tabbar
-// (immersive mobile view); the sidebar still shows on desktop because
-// nav is the only way out.
+// Mobile: shell is a centred phone column, tabbar pins to the bottom.
+// Desktop (≥1024px): sidebar appears, tabbar disappears, shell expands.
+// Only the active nav surface is rendered into the DOM — keeps the
+// a11y tree clean and avoids putting buttons users can't reach into
+// the tab order. app.js re-runs render() when the breakpoint crosses.
+const DESKTOP_QUERY = typeof window !== 'undefined' && window.matchMedia
+  ? window.matchMedia('(min-width: 1024px)')
+  : { matches: false };
+const isDesktop = () => DESKTOP_QUERY.matches;
+
 export function mobileShell({ content, footerActive = 'feed', hideFooter = false }) {
+  const desktop = isDesktop();
   return `
     <div class="m-app">
-      ${sidebar(footerActive)}
+      ${desktop ? sidebar(footerActive) : ''}
       <div class="m-shell ${hideFooter ? 'no-footer' : ''}">
         <div class="m-scroll">${content}</div>
-        ${hideFooter ? '' : tabBar(footerActive)}
+        ${!desktop && !hideFooter ? tabBar(footerActive) : ''}
       </div>
     </div>
   `;
 }
+
+export { DESKTOP_QUERY };
 
 // === Section header (within a scroll region, not page-level) ==========
 export function sectionHead({ title, meta = '' }) {

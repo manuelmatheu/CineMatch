@@ -155,8 +155,6 @@
     padding: 0 var(--s-9) var(--s-7);
   }
 
-  .m-tabbar { display: none; }
-
   /* Header de-mobilises: drop the iOS status-bar offset, drop the
      20px lateral padding (the scroll region carries it now), add a
      hairline divider so it reads as an editorial masthead. */

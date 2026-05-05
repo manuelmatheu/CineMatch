@@ -11,6 +11,7 @@ import {
   setupScreen,
 } from './modules/screens.js';
 import { storage } from './modules/storage.js';
+import { DESKTOP_QUERY } from './modules/ui.js';
 import { validateToken } from './modules/tmdb.js';
 import { fetchRssEntries, parseCsv, mergeHistory } from './modules/letterboxd.js';
 import { resolveHistory, RESOLVER_PROGRESS_EVENT } from './modules/resolver.js';
@@ -388,6 +389,12 @@ root.addEventListener('change', (e) => {
 });
 
 window.addEventListener('hashchange', render);
+
+// Re-render when the desktop breakpoint flips so the correct nav
+// surface (sidebar vs tabbar) is in the DOM, not just hidden via CSS.
+if (DESKTOP_QUERY.addEventListener) {
+  DESKTOP_QUERY.addEventListener('change', render);
+}
 
 // When the resolver completes a batch (every 10 entries), re-render the
 // current screen if it shows live data so posters / enrichment / counts
