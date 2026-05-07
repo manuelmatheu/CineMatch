@@ -483,12 +483,15 @@
   .m-section-head__title { font-size: var(--t-h2); }
 
   .m-grid-section { padding: 0; }
+  /* auto-fill + 1fr lets the grid pack as many columns as fit at the
+     min track width, then stretches them to fill the row evenly — so
+     cards never leave dead space inside their track. Min 120px gets
+     us 7–8 columns on the desktop column at 1088px-ish wide. */
   .m-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    column-gap: var(--s-5);
-    row-gap: var(--s-7);
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    column-gap: var(--s-4);
+    row-gap: var(--s-6);
   }
-  .m-card { max-width: 180px; }
   .m-card { gap: var(--s-3); }
   .m-card__title { font-size: var(--t-h4); }
   .m-card__meta { font-size: var(--t-tiny); }
