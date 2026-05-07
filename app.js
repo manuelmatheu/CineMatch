@@ -12,7 +12,7 @@ import {
 } from './modules/screens.js';
 import { storage } from './modules/storage.js';
 import { DESKTOP_QUERY } from './modules/ui.js';
-import { validateToken } from './modules/tmdb.js';
+import { validateToken, getMovieTrailerUrl } from './modules/tmdb.js';
 import { fetchRssEntries, parseCsv, mergeHistory } from './modules/letterboxd.js';
 import { resolveHistory, RESOLVER_PROGRESS_EVENT } from './modules/resolver.js';
 import { buildRecommendations, RECOMMENDATIONS_PROGRESS_EVENT } from './modules/recommendations.js';
@@ -285,6 +285,12 @@ root.addEventListener('click', (e) => {
       if (window.history.length > 1) window.history.back();
       else navigate('/feed');
       break;
+    case 'open-trailer':
+      handleOpenTrailer(target);
+      break;
+    case 'mark-watched':
+      handleMarkWatched(target);
+      break;
     case 'open-setup':
       navigate('/setup/1');
       break;
@@ -368,6 +374,79 @@ function handleExportRecs() {
   } catch (err) {
     notify(err.message || 'Export failed.', 'error');
   }
+}
+
+// === Detail-screen action handlers ===================================
+// Trailer button: open the popup synchronously (Safari blocks window.open
+// after async work) and navigate it once TMDB returns the YouTube URL.
+async function handleOpenTrailer(btn) {
+  const id = Number(btn?.dataset?.tmdbId);
+  const title = btn?.dataset?.title || 'this film';
+  if (!id) return notify('No trailer available — film is missing a TMDB id.', 'error');
+
+  const token = storage.getToken();
+  if (!token) return notify('TMDB token missing — re-run setup.', 'error');
+
+  const popup = window.open('', '_blank', 'noopener');
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  try {
+    const url = await getMovieTrailerUrl(id, token);
+    if (!url) {
+      if (popup) popup.close();
+      notify(`No trailer on TMDB for ${title}.`, 'info');
+      return;
+    }
+    if (popup) popup.location.href = url;
+    else window.open(url, '_blank', 'noopener'); // pop-up blocker fallback
+  } catch (err) {
+    if (popup) popup.close();
+    console.warn('[CineMatch] trailer fetch failed', err);
+    notify(err.message || 'Could not load trailer.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+// "Already watched": append the film to local history with no rating, so it
+// stops surfacing in recommendations. Triggers a recs rebuild in the background.
+function handleMarkWatched(btn) {
+  const id = Number(btn?.dataset?.tmdbId);
+  const title = btn?.dataset?.title || '';
+  const year = btn?.dataset?.year ? Number(btn.dataset.year) : null;
+  const posterPath = btn?.dataset?.posterPath || null;
+  if (!id || !title) return;
+
+  const history = storage.getHistory();
+  if (history.some((e) => e.tmdb_id === id)) {
+    notify(`${title} is already in your diary.`, 'info');
+    return;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  history.push({
+    title,
+    year,
+    rating: null,
+    watched_date: today,
+    rewatch: false,
+    source: 'manual',
+    tmdb_id: id,
+    poster_path: posterPath || null,
+    letterboxd_uri: null,
+  });
+  storage.setHistory(history);
+  notify(`Marked ${title} as watched.`, 'success');
+
+  // Rebuild recs in background so the watched film drops out of "More for you".
+  buildRecommendations().catch((err) => {
+    console.warn('[CineMatch] post-watched rec rebuild failed', err);
+  });
+
+  // Bounce the user back so they see the updated feed/diary.
+  if (window.history.length > 1) window.history.back();
+  else navigate('/feed');
 }
 
 function handleResetApp() {

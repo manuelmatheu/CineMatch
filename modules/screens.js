@@ -233,6 +233,11 @@ export function detailScreen(film) {
   const lbxLink = f.letterboxd_uri
     || `https://letterboxd.com/search/films/${encodeURIComponent(`${f.title} ${f.year || ''}`)}/`;
 
+  const tmdbId = f.id || f.tmdb_id;
+  const alreadyWatched = tmdbId
+    ? storage.getHistory().some((e) => e.tmdb_id === tmdbId)
+    : false;
+
   const heroBody = f.poster_path
     ? `<img class="m-detail-hero__img" src="https://image.tmdb.org/t/p/w780${f.poster_path}" alt="${esc(f.title)}" />`
     : '';
@@ -256,8 +261,10 @@ export function detailScreen(film) {
 
       <a class="m-btn m-btn--primary m-mt-md" href="${esc(lbxLink)}" target="_blank" rel="noopener">+ Add to Letterboxd watchlist</a>
       <div class="m-detail__cta-row">
-        <button class="m-btn m-btn--ghost">Trailer ↗</button>
-        <button class="m-btn m-btn--ghost-soft">Not for me</button>
+        <button class="m-btn m-btn--ghost" data-action="open-trailer" data-tmdb-id="${tmdbId || ''}" data-title="${esc(f.title)}" ${tmdbId ? '' : 'disabled'}>Trailer ↗</button>
+        ${alreadyWatched
+          ? `<button class="m-btn m-btn--ghost-soft" disabled>✓ Already in your diary</button>`
+          : `<button class="m-btn m-btn--ghost-soft" data-action="mark-watched" data-tmdb-id="${tmdbId || ''}" data-title="${esc(f.title)}" data-year="${f.year || ''}" data-poster-path="${esc(f.poster_path || '')}" ${tmdbId ? '' : 'disabled'}>Already watched</button>`}
       </div>
 
       ${f.why ? `

@@ -189,6 +189,27 @@ export async function getRecommendations(id, token) {
 }
 
 /**
+ * Returns the YouTube watch URL for the best official trailer for `id`.
+ * Preference order: official Trailer → official Teaser → any Trailer →
+ * any Teaser → first YouTube video. Returns null when nothing is available.
+ */
+export async function getMovieTrailerUrl(id, token) {
+  const r = await tmdbFetch(`${TMDB_BASE}/movie/${id}/videos`, token);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`TMDB videos for ${id} failed: HTTP ${r.status}`);
+  const data = await r.json();
+  const yt = (data.results || []).filter((v) => v.site === 'YouTube' && v.key);
+  if (yt.length === 0) return null;
+  const pick =
+    yt.find((v) => v.official && v.type === 'Trailer') ||
+    yt.find((v) => v.official && v.type === 'Teaser') ||
+    yt.find((v) => v.type === 'Trailer') ||
+    yt.find((v) => v.type === 'Teaser') ||
+    yt[0];
+  return `https://www.youtube.com/watch?v=${pick.key}`;
+}
+
+/**
  * Fetches a page of TMDB's upcoming-releases list for a given region.
  * Each page returns ~20 entries with the same lightweight shape as
  * /search/movie results (no director, no genre names — just genre_ids).
