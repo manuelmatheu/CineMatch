@@ -52,8 +52,13 @@ export async function buildRecommendations() {
     if (!token || !profile?.ready) return;
 
     const history = storage.getHistory();
-    const seen = new Set(
+    const seenIds = new Set(
       history.filter((e) => e.tmdb_id && e.tmdb_id > 0).map((e) => e.tmdb_id)
+    );
+    // Title+year fallback so unresolved diary entries (no tmdb_id yet)
+    // still get filtered out of recommendations.
+    const seenTitles = new Set(
+      history.map((e) => titleKey(e.title, e.year)).filter(Boolean)
     );
 
     const sources = pickSourceFilms(history);
@@ -64,7 +69,7 @@ export async function buildRecommendations() {
       return;
     }
 
-    const candidates = await collectCandidates(sources, seen, token);
+    const candidates = await collectCandidates(sources, seenIds, seenTitles, token);
     const scored = scoreCandidates(candidates, profile);
     const top = scored
       .sort((a, b) => b.score - a.score)
@@ -95,7 +100,7 @@ function pickSourceFilms(history) {
 }
 
 // === Candidate collection (one /recommendations call per source) ======
-async function collectCandidates(sources, seen, token) {
+async function collectCandidates(sources, seenIds, seenTitles, token) {
   const candidates = new Map(); // tmdb_id -> candidate object
   let processed = 0;
 
@@ -103,7 +108,9 @@ async function collectCandidates(sources, seen, token) {
     try {
       const results = await fetchTmdbRecs(source.tmdb_id, token);
       for (const cand of results) {
-        if (!cand.id || seen.has(cand.id)) continue;
+        if (!cand.id || seenIds.has(cand.id)) continue;
+        const candYear = cand.release_date ? Number(cand.release_date.slice(0, 4)) : null;
+        if (seenTitles.has(titleKey(cand.title, candYear))) continue;
         const existing = candidates.get(cand.id);
         if (existing) {
           existing.anchorCount += 1;
@@ -189,3 +196,8 @@ function emit(detail) {
 }
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+function titleKey(title, year) {
+  if (!title) return null;
+  return `${String(title).toLowerCase().trim()}|${year || ''}`;
+}
