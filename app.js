@@ -68,6 +68,10 @@ function gateOrRender() {
 }
 
 // === Render ==========================================================
+// Track the last rendered route so incremental re-renders (resolver progress,
+// recommendations progress, etc.) don't reset scroll position. Only navigation
+// to a new screen — or a new film in detail view — should scroll back to top.
+let lastRenderedRouteKey = null;
 function render() {
   const route = parseHash();
   let html = '';
@@ -83,9 +87,23 @@ function render() {
     html = feedScreen();
   }
 
+  const routeKey = route.name === 'detail'
+    ? `detail:${route.filmId}`
+    : route.name === 'setup'
+      ? `setup:${route.step}`
+      : route.name;
+  const routeChanged = routeKey !== lastRenderedRouteKey;
+
+  // Capture current scroll before innerHTML wipes the .m-scroll element, so
+  // background re-renders (resolver progress) don't yank the user back to top.
+  const previousScroll = !routeChanged
+    ? (root.querySelector('.m-scroll')?.scrollTop ?? 0)
+    : 0;
+
   root.innerHTML = html;
   const scroll = root.querySelector('.m-scroll');
-  if (scroll) scroll.scrollTop = 0;
+  if (scroll) scroll.scrollTop = routeChanged ? 0 : previousScroll;
+  lastRenderedRouteKey = routeKey;
 }
 
 function findFilmById(id) {
