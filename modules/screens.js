@@ -263,7 +263,7 @@ export function detailScreen(film) {
       <div class="m-detail__cta-row">
         <button class="m-btn m-btn--ghost" data-action="open-trailer" data-tmdb-id="${tmdbId || ''}" data-title="${esc(f.title)}" ${tmdbId ? '' : 'disabled'}>Trailer ↗</button>
         ${alreadyWatched
-          ? `<button class="m-btn m-btn--ghost-soft" disabled>✓ Already in your diary</button>`
+          ? `<span class="m-detail__watched" role="status">In your diary</span>`
           : `<button class="m-btn m-btn--ghost-soft" data-action="mark-watched" data-tmdb-id="${tmdbId || ''}" data-title="${esc(f.title)}" data-year="${f.year || ''}" data-poster-path="${esc(f.poster_path || '')}" ${tmdbId ? '' : 'disabled'}>Already watched</button>`}
       </div>
 
